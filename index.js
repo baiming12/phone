@@ -4598,6 +4598,7 @@ const STATE = {
   xhsSelectedTag: '日常',
   xhsReplyToCidx: null,
   forumCharNamesText: '',
+  aiDebugLogs: [],
   bankData: null,          // 银行卡资产数据，按 chatId 独立
   wallpaper: null,
   darkMode: false,
@@ -4635,6 +4636,94 @@ function getManualForumCharNames() {
     .split(/[\n,，、]+/)
     .map(s => s.trim())
     .filter(Boolean);
+}
+
+const AI_DEBUG_KEY = 'rp_ai_debug_logs';
+
+function aiDebugEsc(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function aiDebugPreview(val, maxLen = 6000) {
+  try {
+    const s = typeof val === 'string' ? val : JSON.stringify(val, null, 2);
+    if (!s) return '';
+    return s.length > maxLen ? s.slice(0, maxLen) + '\n\n[已截断]' : s;
+  } catch(e) {
+    return String(val || '');
+  }
+}
+
+function aiDebugLoadLogs() {
+  try {
+    return JSON.parse(localStorage.getItem(AI_DEBUG_KEY) || '[]');
+  } catch(e) {
+    return [];
+  }
+}
+
+function aiDebugSaveLogs(logs) {
+  try {
+    localStorage.setItem(AI_DEBUG_KEY, JSON.stringify(logs));
+  } catch(e) {}
+  STATE.aiDebugLogs = logs;
+}
+
+function aiDebugPush(entry) {
+  const logs = aiDebugLoadLogs();
+  logs.unshift({
+    id: 'dbg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+    time: new Date().toLocaleString(),
+    ...entry,
+  });
+  if (logs.length > 30) logs.length = 30;
+  aiDebugSaveLogs(logs);
+  if (STATE.currentView === 'ai-debug') renderAIDebugView();
+}
+
+function aiDebugClear() {
+  aiDebugSaveLogs([]);
+  if (STATE.currentView === 'ai-debug') renderAIDebugView();
+}
+
+function renderAIDebugView() {
+  const box = document.getElementById('rp-ai-debug-list');
+  if (!box) return;
+  const logs = STATE.aiDebugLogs && STATE.aiDebugLogs.length ? STATE.aiDebugLogs : aiDebugLoadLogs();
+  STATE.aiDebugLogs = logs;
+  if (!logs.length) {
+    box.innerHTML = '<div style="padding:24px 16px;color:rgba(0,0,0,.5);font-size:13px;text-align:center">暂无 AI 调试记录</div>';
+    return;
+  }
+  box.innerHTML = logs.map((item, idx) => `
+    <div style="margin:10px 12px;padding:12px;border-radius:14px;background:rgba(255,255,255,.72);backdrop-filter:blur(10px);border:1px solid rgba(0,0,0,.08);box-shadow:0 2px 10px rgba(0,0,0,.06)">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px">
+        <div style="font-size:13px;font-weight:700;color:#1f2937">${aiDebugEsc(item.source || 'AI 调用')}</div>
+        <div style="font-size:10px;color:rgba(0,0,0,.45)">${aiDebugEsc(item.time || '')}</div>
+      </div>
+      <div style="font-size:11px;color:rgba(0,0,0,.55);margin-bottom:8px">provider=${aiDebugEsc(item.provider || '')} · status=${aiDebugEsc(item.status || '')} · max_tokens=${aiDebugEsc(item.maxTokens || '')}</div>
+      <details ${idx===0 ? 'open' : ''} style="margin-bottom:8px">
+        <summary style="cursor:pointer;font-size:12px;font-weight:600;color:#374151">system prompt</summary>
+        <pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;line-height:1.55;background:rgba(0,0,0,.03);padding:10px;border-radius:10px;margin-top:6px">${aiDebugEsc(aiDebugPreview(item.sysMsg || ''))}</pre>
+      </details>
+      <details style="margin-bottom:8px">
+        <summary style="cursor:pointer;font-size:12px;font-weight:600;color:#374151">user prompt</summary>
+        <pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;line-height:1.55;background:rgba(0,0,0,.03);padding:10px;border-radius:10px;margin-top:6px">${aiDebugEsc(aiDebugPreview(item.prompt || ''))}</pre>
+      </details>
+      <details ${idx===0 ? 'open' : ''} style="margin-bottom:8px">
+        <summary style="cursor:pointer;font-size:12px;font-weight:600;color:#374151">raw response</summary>
+        <pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;line-height:1.55;background:rgba(0,0,0,.03);padding:10px;border-radius:10px;margin-top:6px">${aiDebugEsc(aiDebugPreview(item.rawResponse || ''))}</pre>
+      </details>
+      <details style="margin-bottom:0">
+        <summary style="cursor:pointer;font-size:12px;font-weight:600;color:#374151">final extracted text / error</summary>
+        <pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;line-height:1.55;background:rgba(0,0,0,.03);padding:10px;border-radius:10px;margin-top:6px">${aiDebugEsc(aiDebugPreview(item.finalText || item.error || ''))}</pre>
+      </details>
+    </div>
+  `).join('');
 }
 
 function getForumCharNamesForContext(ctx) {
@@ -4722,6 +4811,7 @@ function syncToCurrentChat() {
       diary:         JSON.parse(JSON.stringify(_safeDiary)),
       xhsFeed:       JSON.parse(JSON.stringify(STATE.xhsFeed || [])),
       forumCharNamesText: STATE.forumCharNamesText || '',
+      aiDebugLogs: (STATE.aiDebugLogs || []).slice(0, 30),
       avatars:       Object.assign({}, STATE.avatars || {}),
       bankData:      STATE.bankData ? JSON.parse(JSON.stringify(STATE.bankData)) : null,
     };
@@ -4923,6 +5013,7 @@ function saveState() {
       diary: STATE.diary || [],
       xhsFeed,
       forumCharNamesText: STATE.forumCharNamesText || '',
+      aiDebugLogs: (STATE.aiDebugLogs || []).slice(0, 30),
       darkMode: STATE.darkMode,
       avatars: Object.assign({}, _AV),
       currentView: STATE.currentView || 'home',
@@ -5400,7 +5491,25 @@ const HTML = `
               </div>
             </div>
 
+            <div class="rp-set-section-title">AI 调试</div>
+            <div class="rp-set-section">
+              <div class="rp-set-row" style="display:flex;gap:8px;align-items:center">
+                <span class="rp-set-hint">查看最近的 prompt、系统提示词和 AI 原始返回</span>
+                <button id="rp-ai-debug-open" class="rp-set-upload-btn">打开调试</button>
+                <button id="rp-ai-debug-clear" class="rp-set-upload-btn rp-wall-reset-btn">清空</button>
+              </div>
+            </div>
+
           </div>
+        </div>
+
+        <div id="rp-view-ai-debug" class="rp-view" style="display:none;flex-direction:column">
+          <div class="rp-nav-bar">
+            <button class="rp-back" data-to="settings">‹</button>
+            <span class="rp-nav-title">AI 调试</span>
+            <button id="rp-ai-debug-clear-top" class="rp-nav-add" style="font-size:14px;font-weight:600">清空</button>
+          </div>
+          <div id="rp-ai-debug-list" style="overflow-y:auto;flex:1;padding-bottom:16px"></div>
         </div>
 
         <!-- 2048 游戏 -->
@@ -6302,6 +6411,7 @@ function onChatChanged() {
       diary:   JSON.parse(JSON.stringify(_safeDiary2)),
       xhsFeed: JSON.parse(JSON.stringify(STATE.xhsFeed || [])),
       forumCharNamesText: STATE.forumCharNamesText || '',
+      aiDebugLogs: (STATE.aiDebugLogs || []).slice(0, 30),
       avatars: Object.assign({}, STATE.avatars || {}),
       bankData: STATE.bankData ? JSON.parse(JSON.stringify(STATE.bankData)) : null,
     };
@@ -6325,6 +6435,7 @@ function onChatChanged() {
     STATE.diary   = JSON.parse(JSON.stringify(s.diary   || []));
     STATE.xhsFeed = JSON.parse(JSON.stringify(s.xhsFeed || []));
     STATE.forumCharNamesText = s.forumCharNamesText || '';
+    STATE.aiDebugLogs = s.aiDebugLogs || aiDebugLoadLogs();
     STATE.avatars = Object.assign({}, s.avatars || {});
     STATE.currentThread = s.currentThread;
     STATE.bankData = s.bankData ? JSON.parse(JSON.stringify(s.bankData)) : null;
@@ -6338,6 +6449,7 @@ function onChatChanged() {
       STATE.diary = persisted.diary || [];
       STATE.xhsFeed = persisted.xhsFeed || [];
       STATE.forumCharNamesText = persisted.forumCharNamesText || '';
+      STATE.aiDebugLogs = persisted.aiDebugLogs || aiDebugLoadLogs();
       STATE.avatars = persisted.avatars || {};
       STATE.bankData = persisted.bankData || null;
       STATE.currentThread = null;
@@ -6349,6 +6461,7 @@ function onChatChanged() {
       STATE.diary   = [];
       STATE.xhsFeed = [];
       STATE.forumCharNamesText = '';
+      STATE.aiDebugLogs = aiDebugLoadLogs();
       STATE.avatars = {};
       STATE.bankData = null;
       STATE.currentThread = null;
@@ -6651,6 +6764,15 @@ function bindUI() {
   $(document).on('input', '#rp-forum-char-names', function() {
     STATE.forumCharNamesText = $(this).val() || '';
     saveState();
+  });
+
+  $(document).on('click', '#rp-ai-debug-open', function() {
+    renderAIDebugView();
+    go('ai-debug');
+  });
+
+  $(document).on('click', '#rp-ai-debug-clear, #rp-ai-debug-clear-top', function() {
+    aiDebugClear();
   });
 
   // 小红书 - 发布帖子
@@ -7570,7 +7692,7 @@ function go(view) {
   if (view === 'themes') { lgRenderThemePicker(); }
   $('.rp-view').hide();
   // 需要 flex 布局的视图
-  const flexViews = ['xhs','xhs-detail','xhs-compose','theme-studio'];
+  const flexViews = ['xhs','xhs-detail','xhs-compose','theme-studio','ai-debug'];
   if (flexViews.includes(view)) {
     $(`#rp-view-${view}`).css('display','flex');
   } else {
@@ -7597,6 +7719,9 @@ function go(view) {
   if (view === 'xhs') {
     mergeGlobalAvatars();
     renderXHSFeed(false);
+  }
+  if (view === 'ai-debug') {
+    renderAIDebugView();
   }
   if (view === 'bank') {
     renderBankView();
@@ -15076,7 +15201,9 @@ function lgGetPersona() {
 // ── 自定义 API 调用(支持 DeepSeek / 通义 / GLM 等 OpenAI 兼容格式)──
 async function lgCallAPI(prompt, maxTokens = 150, sysMsg = '') {
   const cfg = (() => { try { return JSON.parse(localStorage.getItem('rp_ludo_api') || '{}'); } catch(e) { return {}; } })();
-  console.log('[LudoAPI] mode:', cfg.mode, '| promptLen:', (typeof prompt === 'string' ? prompt : JSON.stringify(prompt)).length, '| maxTokens:', maxTokens);
+  const promptText = typeof prompt === 'string' ? prompt : aiDebugPreview(prompt, 12000);
+  const providerBase = (cfg.mode === 'custom' && cfg.url && cfg.key) ? 'custom' : 'st_generateRaw';
+  console.log('[LudoAPI] mode:', cfg.mode, '| promptLen:', promptText.length, '| maxTokens:', maxTokens);
 
   // 用户设置了自定义 API → 只用自定义,绝不 fallback 到 ST
   if (cfg.mode === 'custom' && cfg.url && cfg.key) {
@@ -15099,9 +15226,29 @@ async function lgCallAPI(prompt, maxTokens = 150, sysMsg = '') {
       const text = data.choices?.[0]?.message?.content?.trim();
       console.log('[LudoAPI] custom API raw response:', JSON.stringify(data).slice(0, 400));
       console.log('[LudoAPI] custom API extracted text:', JSON.stringify(text));
+      aiDebugPush({
+        source: 'lgCallAPI',
+        provider: providerBase,
+        status: text ? 'ok' : 'empty',
+        maxTokens,
+        sysMsg,
+        prompt: promptText,
+        rawResponse: aiDebugPreview(data, 12000),
+        finalText: text || ''
+      });
       if (text) return text;
       console.warn('[Ludo] custom API returned empty response, full data:', JSON.stringify(data));
     } catch(e) {
+      aiDebugPush({
+        source: 'lgCallAPI',
+        provider: providerBase,
+        status: 'error',
+        maxTokens,
+        sysMsg,
+        prompt: promptText,
+        rawResponse: '',
+        error: e?.stack || e?.message || String(e)
+      });
       console.warn('[Ludo] custom API error:', e.message);
     }
     return null; // 自定义 API 失败,不走 ST,直接返回 null(触发 fallback 文本)
@@ -15117,12 +15264,42 @@ async function lgCallAPI(prompt, maxTokens = 150, sysMsg = '') {
       console.log('[LudoAPI] ST generateRaw → messages:', JSON.stringify(msgs).slice(0, 300));
       const resp = await generateRaw({ prompt: msgs, responseLength: maxTokens });
       console.log('[LudoAPI] ST generateRaw raw resp:', JSON.stringify(resp));
+      aiDebugPush({
+        source: 'lgCallAPI',
+        provider: providerBase,
+        status: resp && resp.trim() ? 'ok' : 'empty',
+        maxTokens,
+        sysMsg,
+        prompt: promptText,
+        rawResponse: aiDebugPreview(resp, 12000),
+        finalText: resp && resp.trim() ? resp.trim() : ''
+      });
       if (resp && resp.trim()) return resp.trim();
       console.warn('[LudoAPI] ST generateRaw returned empty');
     } else {
+      aiDebugPush({
+        source: 'lgCallAPI',
+        provider: providerBase,
+        status: 'unavailable',
+        maxTokens,
+        sysMsg,
+        prompt: promptText,
+        rawResponse: '',
+        error: 'generateRaw not available'
+      });
       console.warn('[LudoAPI] generateRaw not available');
     }
   } catch(e) {
+    aiDebugPush({
+      source: 'lgCallAPI',
+      provider: providerBase,
+      status: 'error',
+      maxTokens,
+      sysMsg,
+      prompt: promptText,
+      rawResponse: '',
+      error: e?.stack || e?.message || String(e)
+    });
     console.warn('[LudoAPI] ST generateRaw error:', e.message, e.stack?.slice(0,200));
   }
   return null;
