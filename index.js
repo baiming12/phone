@@ -4593,11 +4593,11 @@ const STATE = {
   chatId: null,
   pendingMessages: [], // FIX3: 多条消息队列
   moments: [],
-  diary: [],
   xhsFeed: [],
   xhsCurrentPost: null,
   xhsSelectedTag: '日常',
   xhsReplyToCidx: null,
+  forumCharNamesText: '',
   bankData: null,          // 银行卡资产数据，按 chatId 独立
   wallpaper: null,
   darkMode: false,
@@ -4627,6 +4627,21 @@ function setAvatar(key, dataUrl) {
   _AV[key] = dataUrl;
   STATE.avatars = STATE.avatars || {};
   STATE.avatars[key] = dataUrl;
+}
+
+
+function getManualForumCharNames() {
+  return String(STATE.forumCharNamesText || '')
+    .split(/[\n,，、]+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+function getForumCharNamesForContext(ctx) {
+  const manualNames = getManualForumCharNames();
+  if (manualNames.length) return manualNames;
+  const fallbackName = ctx?.name2 || ctx?.name || 'TA';
+  return [fallbackName].filter(Boolean);
 }
 
 
@@ -4698,7 +4713,6 @@ function syncToCurrentChat() {
     };
     const _safeMoments = _safeArr(STATE.moments, _oldPersisted && _oldPersisted.moments);
     const _safeDiary   = _safeArr(STATE.diary,   _oldPersisted && _oldPersisted.diary);
-    const _safeXhs     = _safeArr(STATE.xhsFeed, _oldPersisted && _oldPersisted.xhsFeed);
     CHAT_STORE[STATE.chatId] = {
       threads:       JSON.parse(JSON.stringify(STATE.threads)),
       notifications: [...STATE.notifications],
@@ -4706,14 +4720,15 @@ function syncToCurrentChat() {
       currentThread: STATE.currentThread,
       moments:       JSON.parse(JSON.stringify(_safeMoments)),
       diary:         JSON.parse(JSON.stringify(_safeDiary)),
-      xhsFeed:       JSON.parse(JSON.stringify(_safeXhs)),
+      xhsFeed:       JSON.parse(JSON.stringify(STATE.xhsFeed || [])),
+      forumCharNamesText: STATE.forumCharNamesText || '',
       avatars:       Object.assign({}, STATE.avatars || {}),
       bankData:      STATE.bankData ? JSON.parse(JSON.stringify(STATE.bankData)) : null,
     };
-    const _tmpM = STATE.moments, _tmpD = STATE.diary, _tmpX = STATE.xhsFeed;
-    STATE.moments = _safeMoments; STATE.diary = _safeDiary; STATE.xhsFeed = _safeXhs;
+    const _tmpM = STATE.moments, _tmpD = STATE.diary;
+    STATE.moments = _safeMoments; STATE.diary = _safeDiary;
     saveState();
-    STATE.moments = _tmpM; STATE.diary = _tmpD; STATE.xhsFeed = _tmpX;
+    STATE.moments = _tmpM; STATE.diary = _tmpD;
   }
 
   // 切到新窗口
@@ -4728,6 +4743,7 @@ function syncToCurrentChat() {
     STATE.moments       = JSON.parse(JSON.stringify(s.moments || []));
     STATE.diary         = JSON.parse(JSON.stringify(s.diary   || []));
     STATE.xhsFeed       = JSON.parse(JSON.stringify(s.xhsFeed || []));
+    STATE.forumCharNamesText = s.forumCharNamesText || '';
     STATE.avatars       = Object.assign({}, s.avatars || {});
     STATE.currentThread = s.currentThread || null;
     STATE.bankData      = s.bankData ? JSON.parse(JSON.stringify(s.bankData)) : null;
@@ -4740,6 +4756,7 @@ function syncToCurrentChat() {
       STATE.moments       = persisted.moments || [];
       STATE.diary         = persisted.diary   || [];
       STATE.xhsFeed       = persisted.xhsFeed || [];
+      STATE.forumCharNamesText = persisted.forumCharNamesText || '';
       STATE.avatars       = persisted.avatars || {};
       STATE.bankData      = persisted.bankData || null;
     } else {
@@ -4749,6 +4766,7 @@ function syncToCurrentChat() {
       STATE.moments       = [];
       STATE.diary         = [];
       STATE.xhsFeed       = [];
+      STATE.forumCharNamesText = '';
       STATE.avatars       = {};
       STATE.bankData      = null;
     }
@@ -4894,20 +4912,17 @@ function saveState() {
         );
       }
     }
-    // moments / diary / xhsFeed 做轻量持久化，避免 localStorage 过大
+    // moments 只保留最近50条
     const moments = (STATE.moments || []).slice(-50);
-    const diary = (STATE.diary || []).slice(-20);
-    const xhsFeed = (STATE.xhsFeed || []).slice(0, 30).map(p => ({
-      ...p,
-      comments: (p.comments || []).slice(-20),
-    }));
+    const xhsFeed = (STATE.xhsFeed || []).slice(0, 30);
     const payload = {
       threads,
       notifications: STATE.notifications,
       sync: STATE.sync,
       moments,
-      diary,
+      diary: STATE.diary || [],
       xhsFeed,
+      forumCharNamesText: STATE.forumCharNamesText || '',
       darkMode: STATE.darkMode,
       avatars: Object.assign({}, _AV),
       currentView: STATE.currentView || 'home',
@@ -5377,14 +5392,11 @@ const HTML = `
               </div>
             </div>
 
-            <div class="rp-set-section-title">社交摘要导出</div>
+            <div class="rp-set-section-title">论坛角色名单</div>
             <div class="rp-set-section">
               <div class="rp-set-row" style="flex-direction:column;align-items:stretch;gap:8px">
-                <div style="font-size:12px;line-height:1.6;color:#8a8a9a">把朋友圈、小红书、日记整理成纯文本，方便你手动贴进世界书。</div>
-                <div style="display:flex;gap:8px">
-                  <button id="rp-copy-social-summary" class="rp-set-upload-btn" style="flex:1">复制摘要</button>
-                  <button id="rp-download-social-summary" class="rp-set-upload-btn" style="flex:1">下载 TXT</button>
-                </div>
+                <textarea id="rp-forum-char-names" style="width:100%;min-height:88px;border:1px solid rgba(0,0,0,.12);border-radius:10px;padding:10px;font-family:inherit;resize:vertical;box-sizing:border-box;" placeholder="一行一个，或用逗号分隔，例如：&#10;斯卡蒂&#10;幽灵鲨&#10;歌蕾蒂娅"></textarea>
+                <div style="font-size:12px;opacity:.65;line-height:1.5;">论坛生成时优先使用这里的角色名单；留空时才使用当前角色名</div>
               </div>
             </div>
 
@@ -5720,8 +5732,6 @@ async function init() {
     STATE.notifications = saved.notifications || [];
     STATE.sync = saved.sync || { stage: 1, progress: 0, status: '乖巧' };
     STATE.moments = saved.moments || [];
-    STATE.diary = saved.diary || [];
-    STATE.xhsFeed = saved.xhsFeed || [];
     STATE.avatars = saved.avatars || {};
     STATE.darkMode = saved.darkMode || false;
     // 恢复上次停留的界面(仅限同一 session 内,刷新页面后回锁屏)
@@ -6283,7 +6293,6 @@ function onChatChanged() {
     };
     const _safeMoments2 = _safeArr2(STATE.moments, _oldPersisted2 && _oldPersisted2.moments);
     const _safeDiary2   = _safeArr2(STATE.diary,   _oldPersisted2 && _oldPersisted2.diary);
-    const _safeXhs2     = _safeArr2(STATE.xhsFeed, _oldPersisted2 && _oldPersisted2.xhsFeed);
     CHAT_STORE[STATE.chatId] = {
       threads: JSON.parse(JSON.stringify(STATE.threads)),
       notifications: [...STATE.notifications],
@@ -6291,14 +6300,15 @@ function onChatChanged() {
       currentThread: STATE.currentThread,
       moments: JSON.parse(JSON.stringify(_safeMoments2)),
       diary:   JSON.parse(JSON.stringify(_safeDiary2)),
-      xhsFeed: JSON.parse(JSON.stringify(_safeXhs2)),
+      xhsFeed: JSON.parse(JSON.stringify(STATE.xhsFeed || [])),
+      forumCharNamesText: STATE.forumCharNamesText || '',
       avatars: Object.assign({}, STATE.avatars || {}),
       bankData: STATE.bankData ? JSON.parse(JSON.stringify(STATE.bankData)) : null,
     };
-    const _tmpM2 = STATE.moments, _tmpD2 = STATE.diary, _tmpX2 = STATE.xhsFeed;
-    STATE.moments = _safeMoments2; STATE.diary = _safeDiary2; STATE.xhsFeed = _safeXhs2;
+    const _tmpM2 = STATE.moments, _tmpD2 = STATE.diary;
+    STATE.moments = _safeMoments2; STATE.diary = _safeDiary2;
     saveState();
-    STATE.moments = _tmpM2; STATE.diary = _tmpD2; STATE.xhsFeed = _tmpX2;
+    STATE.moments = _tmpM2; STATE.diary = _tmpD2;
   }
 
   // 切换到新窗口
@@ -6314,6 +6324,7 @@ function onChatChanged() {
     STATE.moments = JSON.parse(JSON.stringify(s.moments || []));
     STATE.diary   = JSON.parse(JSON.stringify(s.diary   || []));
     STATE.xhsFeed = JSON.parse(JSON.stringify(s.xhsFeed || []));
+    STATE.forumCharNamesText = s.forumCharNamesText || '';
     STATE.avatars = Object.assign({}, s.avatars || {});
     STATE.currentThread = s.currentThread;
     STATE.bankData = s.bankData ? JSON.parse(JSON.stringify(s.bankData)) : null;
@@ -6326,6 +6337,7 @@ function onChatChanged() {
       STATE.moments = persisted.moments || [];
       STATE.diary = persisted.diary || [];
       STATE.xhsFeed = persisted.xhsFeed || [];
+      STATE.forumCharNamesText = persisted.forumCharNamesText || '';
       STATE.avatars = persisted.avatars || {};
       STATE.bankData = persisted.bankData || null;
       STATE.currentThread = null;
@@ -6336,6 +6348,7 @@ function onChatChanged() {
       STATE.moments = [];
       STATE.diary   = [];
       STATE.xhsFeed = [];
+      STATE.forumCharNamesText = '';
       STATE.avatars = {};
       STATE.bankData = null;
       STATE.currentThread = null;
@@ -6633,6 +6646,11 @@ function bindUI() {
     $('.rp-xhs-tag-btn').removeClass('rp-xhs-tag-selected');
     $(this).addClass('rp-xhs-tag-selected');
     STATE.xhsSelectedTag = $(this).data('tag');
+  });
+
+  $(document).on('input', '#rp-forum-char-names', function() {
+    STATE.forumCharNamesText = $(this).val() || '';
+    saveState();
   });
 
   // 小红书 - 发布帖子
@@ -7434,14 +7452,6 @@ function bindUI() {
     applyWallpaper();
   });
 
-  $(document).on('click', '#rp-copy-social-summary', async function() {
-    await copySocialSummary();
-  });
-
-  $(document).on('click', '#rp-download-social-summary', function() {
-    downloadSocialSummary();
-  });
-
 }
 
 // ================================================================
@@ -7571,7 +7581,11 @@ function go(view) {
   // 切换到 home 时重置到第0屏
   if (view === 'home' && window._rpHomeSwipeGoto) { window._rpHomeSwipeGoto(0, false); }
 
-  if (view === 'settings') { _bindAvatarUpload(); }
+  if (view === 'settings') {
+    _bindAvatarUpload();
+    const _forumTa = document.getElementById('rp-forum-char-names');
+    if (_forumTa) _forumTa.value = STATE.forumCharNamesText || '';
+  }
 
   if (view === 'messages') {
     renderThreadList();
@@ -9763,117 +9777,6 @@ function updateAvatarPreviewSwatch(who) {
 }
 
 // ================================================================
-//  SOCIAL SUMMARY EXPORT
-// ================================================================
-function _rpSummaryCut(text, maxLen) {
-  return String(text || '').replace(/\s+/g, ' ').trim().slice(0, maxLen || 80);
-}
-
-function buildSocialSummaryText() {
-  const ctx = getContext() || {};
-  const userName = ctx?.name1 || '我';
-  const lines = [];
-  const now = new Date();
-  const exportedAt = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-
-  lines.push(`社交摘要导出`);
-  lines.push(`聊天ID：${STATE.chatId || 'default'}`);
-  lines.push(`导出时间：${exportedAt}`);
-
-  const moments = (STATE.moments || []).slice(-10).reverse();
-  lines.push('\n【朋友圈】');
-  if (!moments.length) {
-    lines.push('- 无');
-  } else {
-    moments.forEach(m => {
-      const who = m.from === 'user' ? userName : (m.name || '未知');
-      const main = m.text ? _rpSummaryCut(m.text, 120) : (m.img ? '[图片动态]' : '[无文字动态]');
-      const likes = (m.likes || []).map(v => v === 'user' ? userName : v).filter(Boolean).slice(0, 6);
-      const comments = (m.comments || []).slice(0, 4).map(c => `${c.name || c.user || '网友'}：${_rpSummaryCut(c.text, 30)}`);
-      lines.push(`- ${who}｜${m.time || ''}｜${main}`);
-      if (likes.length) lines.push(`  点赞：${likes.join('、')}`);
-      if (comments.length) lines.push(`  评论：${comments.join(' | ')}`);
-    });
-  }
-
-  const posts = (STATE.xhsFeed || []).slice(0, 8);
-  lines.push('\n【小红书】');
-  if (!posts.length) {
-    lines.push('- 无');
-  } else {
-    posts.forEach(p => {
-      const title = _rpSummaryCut(p.title || '无标题', 40);
-      const body = _rpSummaryCut(p.body || '', 140);
-      const comments = (p.comments || []).slice(0, 4).map(c => `${c.user || '网友'}：${_rpSummaryCut(c.text, 30)}`);
-      lines.push(`- ${p.user || '未知'}｜${p.date || ''} ${p.time || ''}｜#${p.tag || '日常'}｜${title}`);
-      lines.push(`  正文：${body}`);
-      if ((p.likes || 0)) lines.push(`  点赞数：${p.likes}${p.likedByUser ? '（你已点赞）' : ''}`);
-      if (comments.length) lines.push(`  评论：${comments.join(' | ')}`);
-    });
-  }
-
-  const diaryEntries = (STATE.diary || []).slice(-6).reverse();
-  lines.push('\n【日记】');
-  if (!diaryEntries.length) {
-    lines.push('- 无');
-  } else {
-    diaryEntries.forEach(d => {
-      const who = d.author === 'ai' ? '角色' : userName;
-      lines.push(`- ${who}｜${d.date || ''} ${d.time || ''}`);
-      lines.push(`  内容：${_rpSummaryCut(d.text, 160)}`);
-      if (d.reply) lines.push(`  回复：${_rpSummaryCut(d.reply, 100)}`);
-    });
-  }
-
-  return lines.join('\n').trim();
-}
-
-async function copySocialSummary() {
-  const text = buildSocialSummaryText();
-  if (!text) {
-    alert('暂无可导出的内容');
-    return;
-  }
-  try {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      await navigator.clipboard.writeText(text);
-    } else {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.setAttribute('readonly', 'readonly');
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      ta.remove();
-    }
-    alert('社交摘要已复制，可以直接粘贴到世界书');
-  } catch (e) {
-    console.warn('[Phone] copySocialSummary failed', e);
-    window.prompt('复制失败，请手动复制下面内容：', text);
-  }
-}
-
-function downloadSocialSummary() {
-  const text = buildSocialSummaryText();
-  if (!text) {
-    alert('暂无可导出的内容');
-    return;
-  }
-  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `rp-social-summary-${STATE.chatId || 'default'}.txt`;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => {
-    URL.revokeObjectURL(a.href);
-    a.remove();
-  }, 0);
-}
-
-// ================================================================
 //  CALL
 // ================================================================
 function incomingCall(fromRaw, time) {
@@ -11102,7 +11005,7 @@ async function _doGetMomentsCtx() {
 
   // 近30条对话(足够捕捉 NPC 语气)
   const recentChat = (ctx?.chat || []).slice(-30).map(m => {
-    const spk = m.is_user ? userName : (m.name || charName);
+    const spk = m.is_user ? userName : (m.name || charNames[0] || 'TA');
     return spk + ': ' + ((m.mes || '').replace(/<[^>]+>/g, '').trim().slice(0, 150));
   }).join('\n') || '(暂无对话记录)';
   // 提取主角人设(description + personality + scenario)
@@ -12097,7 +12000,7 @@ async function generateBankData(force) {
 
     // 近期对话（扩展到30条，每条保留更多内容）
     const chatMsgs = (rawCtx?.chat || []).slice(-30).map(m => {
-      const spk = m.is_user ? userName : (m.name || charName);
+      const spk = m.is_user ? userName : (m.name || charNames[0] || 'TA');
       return spk + ': ' + ((m.mes || '').replace(/<[^>]+>/g, '').trim().slice(0, 300));
     }).join('\n') || '（暂无对话记录）';
 
@@ -12213,7 +12116,9 @@ async function buildXHSFeedWithAI(appendMode) {
     charName = ctx0?.name2 || ctx0?.name || 'TA';
     userName = ctx0?.name1 || '用户';
   }
-  const charLast = charName.split(/\s+/).pop() || charName || 'TA';
+  const ctxXhs = getContext() || {};
+  const charNames = getForumCharNamesForContext(ctxXhs);
+  const charNamesText = charNames.join('、') || charName || 'TA';
 
   // 合并新帖子到列表(追加模式:新帖插到陌生人帖子最前面,超10条删最旧的)
   function mergeNewPosts(newPosts) {
@@ -12238,36 +12143,50 @@ async function buildXHSFeedWithAI(appendMode) {
 
   // 随机选3个话题方向,保证每次刷新内容不重复
   const topicPool = [
-    `围绕${charName}和${userName}关系的八卦讨论(目击者/知情人视角)`,
-    `关于${charName}的个人生活/性格传闻(不涉及${userName})`,
-    `${charName}在商界/社交圈的传闻与评价`,
-    `探讨收养关系/年龄差感情的社会观察(以${charName}为例)`,
-    `${charName}的外形/品味/生活方式被路人讨论`,
-    `${userName}被目击或被讨论(陌生人视角,不知道她身份)`,
-    `某次公开活动上${charName}的行为引发讨论`,
-    `关于有钱有势的人如何对待身边年轻人的社会话题`,
-    `小道消息:${charName}圈子里的人际关系传闻`,
-    `${charName}的过去/背景被挖掘讨论`,
+    `围绕${charNamesText}之间关系的八卦讨论`,
+    `关于${charNamesText}其中一人的生活或性格传闻`,
+    `${charNamesText}在社交圈里的评价与见闻`,
+    `围绕${charNamesText}某次公开互动的讨论`,
+    `有人目击${charNamesText}其中两人一起出现后的猜测`,
+    `关于${charNamesText}过去经历被翻出来讨论`,
+    `旁观者对${charNamesText}关系变化的观察`,
+    `围绕${charNamesText}之一的外形、气质、作风的闲聊`,
+    `关于${charNamesText}中某人的传闻和不同看法`,
+    `讨论${charNamesText}之间微妙气氛的一条帖子`,
   ];
   const pick3 = (arr) => { const a=[...arr].sort(()=>Math.random()-0.5); return a.slice(0,3); };
   const chosenTopics = pick3(topicPool);
 
   try {
-    const sysMsg = `你是一个小红书内容生成器。严格按要求生成3条帖子,每条各自独立,内容和评论绝对不能重复。
-帖子要求:
-- 话题严格对应下方给出的3个不同方向,不要全写成同一种八卦
-- 陌生路人/网友视角,口语化,有具体细节,正文40-60字
+    const sysMsg = `你是一个论坛帖子生成器。严格按要求生成3条帖子，每条帖子独立，内容和评论不能重复。
 
-评论要求(每条帖子各自生成5条,三条帖子的评论内容不能相同):
-- 必须包含:吐槽型(1条)、共情型(1条)、懂哥长评(1条,30-40字)、看热闹型(1条)、补料型(1条)
-- 每条评论的昵称和内容都不能跟其他帖子的评论相同
+本次帖子可能涉及的角色有：${charNamesText}
+你可以：
+- 任选其中1个角色作为帖子核心
+- 或选择其中2到3个角色之间的互动/关系作为帖子核心
+- 不要求每条帖子都提到全部角色
 
-只返回JSON数组,格式:
-[{"user":"昵称emoji","tag":"标签","title":"标题","body":"正文","likes":数字,"comments":[{"user":"昵称emoji","text":"评论内容"}]}]
-共3条,不要有其他文字。
-重要:所有字段值内部不能出现双引号,如需引用请用「」或【】代替。`;
+帖子要求：
+- 话题严格对应下方给出的3个不同方向
+- 采用普通网友发帖视角，像围观者、旁观者、路人、熟人、知情人发帖
+- 标题简洁明确，像论坛标题
+- 正文40到90字，口语化，自然
+- 不要写成小红书、短视频、营销号文案
+- 可以八卦、猜测、观察、吐槽，但不要太浮夸
 
-    const charInfo = charPersona ? charPersona.slice(0, 150) : `角色名:${charName}`;
+评论要求（每条帖子各自生成5条）：
+- 评论像论坛回帖
+- 可以包含：共鸣、追问、补充经历、吐槽、质疑、分析、站队
+- 每条评论都要像不同的人说话
+- 评论内容和昵称都不能重复
+
+只返回JSON数组，格式如下：
+[{"user":"昵称","tag":"标签","title":"标题","body":"正文","likes":数字,"comments":[{"user":"昵称","text":"评论内容"}]}]
+
+共3条，不要有任何解释文字。
+重要：字段值内部不要出现英文双引号。`;
+
+    const charInfo = charPersona ? charPersona.slice(0, 150) : `角色名单:${charNamesText}`;
     const prompt = `角色信息:${charInfo}\n用户名:${userName}\n近期对话片段:${(recentChat||'').slice(0,100)}\n\n本次3条帖子话题方向:\n${chosenTopics.map((t,i)=>`${i+1}. ${t}`).join('\n')}\n\n生成JSON:`;
 
     const resp = await xhsCallAPI(prompt, sysMsg);
@@ -12474,8 +12393,8 @@ async function generateXHSStrangerComments(postId) {
   const post = (STATE.xhsFeed || []).find(p => p.id === postId);
   if (!post || post.from !== 'user') return;
   const ctx = getContext() || {};
-  const charName = ctx?.name2 || ctx?.name || 'TA';
-  const charLast = charName.split(/\s+/).pop() || charName;
+  const charNames = getForumCharNamesForContext(ctx);
+  const charNamesText = charNames.join('、') || 'TA';
   const userName = ctx?.name1 || '楼主';
 
   // 从角色卡提取关系背景
