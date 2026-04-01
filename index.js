@@ -4598,7 +4598,10 @@ const STATE = {
   xhsSelectedTag: '日常',
   xhsReplyToCidx: null,
   forumCharNamesText: '',
-  aiDebugLogs: [],
+  forumTopicPoolText: '',
+  forumFeedPromptText: '',
+  forumCommentPromptText: '',
+  forumReplyPromptText: '',
   bankData: null,          // 银行卡资产数据，按 chatId 独立
   wallpaper: null,
   darkMode: false,
@@ -4628,109 +4631,6 @@ function setAvatar(key, dataUrl) {
   _AV[key] = dataUrl;
   STATE.avatars = STATE.avatars || {};
   STATE.avatars[key] = dataUrl;
-}
-
-
-function getManualForumCharNames() {
-  return String(STATE.forumCharNamesText || '')
-    .split(/[\n,，、]+/)
-    .map(s => s.trim())
-    .filter(Boolean);
-}
-
-const AI_DEBUG_KEY = 'rp_ai_debug_logs';
-
-function aiDebugEsc(str) {
-  return String(str == null ? '' : str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-function aiDebugPreview(val, maxLen = 50000) {
-  try {
-    const s = typeof val === 'string' ? val : JSON.stringify(val, null, 2);
-    if (!s) return '';
-    return s.length > maxLen ? s.slice(0, maxLen) + '\n\n[已截断]' : s;
-  } catch(e) {
-    return String(val || '');
-  }
-}
-
-function aiDebugLoadLogs() {
-  try {
-    return JSON.parse(localStorage.getItem(AI_DEBUG_KEY) || '[]');
-  } catch(e) {
-    return [];
-  }
-}
-
-function aiDebugSaveLogs(logs) {
-  try {
-    localStorage.setItem(AI_DEBUG_KEY, JSON.stringify(logs));
-  } catch(e) {}
-  STATE.aiDebugLogs = logs;
-}
-
-function aiDebugPush(entry) {
-  const logs = aiDebugLoadLogs();
-  logs.unshift({
-    id: 'dbg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
-    time: new Date().toLocaleString(),
-    ...entry,
-  });
-  if (logs.length > 30) logs.length = 30;
-  aiDebugSaveLogs(logs);
-  if (STATE.currentView === 'ai-debug') renderAIDebugView();
-}
-
-function aiDebugClear() {
-  aiDebugSaveLogs([]);
-  if (STATE.currentView === 'ai-debug') renderAIDebugView();
-}
-
-function renderAIDebugView() {
-  const box = document.getElementById('rp-ai-debug-list');
-  if (!box) return;
-  const logs = STATE.aiDebugLogs && STATE.aiDebugLogs.length ? STATE.aiDebugLogs : aiDebugLoadLogs();
-  STATE.aiDebugLogs = logs;
-  if (!logs.length) {
-    box.innerHTML = '<div style="padding:24px 16px;color:rgba(0,0,0,.5);font-size:13px;text-align:center">暂无 AI 调试记录</div>';
-    return;
-  }
-  box.innerHTML = logs.map((item, idx) => `
-    <div style="margin:10px 12px;padding:12px;border-radius:14px;background:rgba(255,255,255,.72);backdrop-filter:blur(10px);border:1px solid rgba(0,0,0,.08);box-shadow:0 2px 10px rgba(0,0,0,.06)">
-      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px">
-        <div style="font-size:13px;font-weight:700;color:#1f2937">${aiDebugEsc(item.source || 'AI 调用')}</div>
-        <div style="font-size:10px;color:rgba(0,0,0,.45)">${aiDebugEsc(item.time || '')}</div>
-      </div>
-      <div style="font-size:11px;color:rgba(0,0,0,.55);margin-bottom:8px">provider=${aiDebugEsc(item.provider || '')} · status=${aiDebugEsc(item.status || '')} · max_tokens=${aiDebugEsc(item.maxTokens || '')}</div>
-      <details ${idx===0 ? 'open' : ''} style="margin-bottom:8px">
-        <summary style="cursor:pointer;font-size:12px;font-weight:600;color:#374151">system prompt</summary>
-        <pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;line-height:1.55;background:rgba(0,0,0,.03);padding:10px;border-radius:10px;margin-top:6px">${aiDebugEsc(aiDebugPreview(item.sysMsg || ''))}</pre>
-      </details>
-      <details style="margin-bottom:8px">
-        <summary style="cursor:pointer;font-size:12px;font-weight:600;color:#374151">user prompt</summary>
-        <pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;line-height:1.55;background:rgba(0,0,0,.03);padding:10px;border-radius:10px;margin-top:6px">${aiDebugEsc(aiDebugPreview(item.prompt || ''))}</pre>
-      </details>
-      <details ${idx===0 ? 'open' : ''} style="margin-bottom:8px">
-        <summary style="cursor:pointer;font-size:12px;font-weight:600;color:#374151">raw response</summary>
-        <pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;line-height:1.55;background:rgba(0,0,0,.03);padding:10px;border-radius:10px;margin-top:6px">${aiDebugEsc(aiDebugPreview(item.rawResponse || ''))}</pre>
-      </details>
-      <details style="margin-bottom:0">
-        <summary style="cursor:pointer;font-size:12px;font-weight:600;color:#374151">final extracted text / error</summary>
-        <pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;line-height:1.55;background:rgba(0,0,0,.03);padding:10px;border-radius:10px;margin-top:6px">${aiDebugEsc(aiDebugPreview(item.finalText || item.error || ''))}</pre>
-      </details>
-    </div>
-  `).join('');
-}
-
-function getForumCharNamesForContext(ctx) {
-  const manualNames = getManualForumCharNames();
-  if (manualNames.length) return manualNames;
-  const fallbackName = ctx?.name2 || ctx?.name || 'TA';
-  return [fallbackName].filter(Boolean);
 }
 
 
@@ -4809,9 +4709,12 @@ function syncToCurrentChat() {
       currentThread: STATE.currentThread,
       moments:       JSON.parse(JSON.stringify(_safeMoments)),
       diary:         JSON.parse(JSON.stringify(_safeDiary)),
-      xhsFeed:       JSON.parse(JSON.stringify(STATE.xhsFeed || [])),
+      xhsFeed:        JSON.parse(JSON.stringify(STATE.xhsFeed || [])),
       forumCharNamesText: STATE.forumCharNamesText || '',
-      aiDebugLogs: (STATE.aiDebugLogs || []).slice(0, 30),
+      forumTopicPoolText: STATE.forumTopicPoolText || '',
+      forumFeedPromptText: STATE.forumFeedPromptText || '',
+      forumCommentPromptText: STATE.forumCommentPromptText || '',
+      forumReplyPromptText: STATE.forumReplyPromptText || '',
       avatars:       Object.assign({}, STATE.avatars || {}),
       bankData:      STATE.bankData ? JSON.parse(JSON.stringify(STATE.bankData)) : null,
     };
@@ -4834,6 +4737,10 @@ function syncToCurrentChat() {
     STATE.diary         = JSON.parse(JSON.stringify(s.diary   || []));
     STATE.xhsFeed       = JSON.parse(JSON.stringify(s.xhsFeed || []));
     STATE.forumCharNamesText = s.forumCharNamesText || '';
+    STATE.forumTopicPoolText = s.forumTopicPoolText || '';
+    STATE.forumFeedPromptText = s.forumFeedPromptText || '';
+    STATE.forumCommentPromptText = s.forumCommentPromptText || '';
+    STATE.forumReplyPromptText = s.forumReplyPromptText || '';
     STATE.avatars       = Object.assign({}, s.avatars || {});
     STATE.currentThread = s.currentThread || null;
     STATE.bankData      = s.bankData ? JSON.parse(JSON.stringify(s.bankData)) : null;
@@ -4847,6 +4754,10 @@ function syncToCurrentChat() {
       STATE.diary         = persisted.diary   || [];
       STATE.xhsFeed       = persisted.xhsFeed || [];
       STATE.forumCharNamesText = persisted.forumCharNamesText || '';
+      STATE.forumTopicPoolText = persisted.forumTopicPoolText || '';
+      STATE.forumFeedPromptText = persisted.forumFeedPromptText || '';
+      STATE.forumCommentPromptText = persisted.forumCommentPromptText || '';
+      STATE.forumReplyPromptText = persisted.forumReplyPromptText || '';
       STATE.avatars       = persisted.avatars || {};
       STATE.bankData      = persisted.bankData || null;
     } else {
@@ -4857,6 +4768,10 @@ function syncToCurrentChat() {
       STATE.diary         = [];
       STATE.xhsFeed       = [];
       STATE.forumCharNamesText = '';
+      STATE.forumTopicPoolText = '';
+      STATE.forumFeedPromptText = '';
+      STATE.forumCommentPromptText = '';
+      STATE.forumReplyPromptText = '';
       STATE.avatars       = {};
       STATE.bankData      = null;
     }
@@ -5004,16 +4919,18 @@ function saveState() {
     }
     // moments 只保留最近50条
     const moments = (STATE.moments || []).slice(-50);
-    const xhsFeed = (STATE.xhsFeed || []).slice(0, 30);
     const payload = {
       threads,
       notifications: STATE.notifications,
       sync: STATE.sync,
       moments,
       diary: STATE.diary || [],
-      xhsFeed,
+      xhsFeed: STATE.xhsFeed || [],
       forumCharNamesText: STATE.forumCharNamesText || '',
-      aiDebugLogs: (STATE.aiDebugLogs || []).slice(0, 30),
+      forumTopicPoolText: STATE.forumTopicPoolText || '',
+      forumFeedPromptText: STATE.forumFeedPromptText || '',
+      forumCommentPromptText: STATE.forumCommentPromptText || '',
+      forumReplyPromptText: STATE.forumReplyPromptText || '',
       darkMode: STATE.darkMode,
       avatars: Object.assign({}, _AV),
       currentView: STATE.currentView || 'home',
@@ -5486,30 +5403,40 @@ const HTML = `
             <div class="rp-set-section-title">论坛角色名单</div>
             <div class="rp-set-section">
               <div class="rp-set-row" style="flex-direction:column;align-items:stretch;gap:8px">
+                <div class="rp-set-key" style="width:100%">论坛生成优先角色</div>
                 <textarea id="rp-forum-char-names" style="width:100%;min-height:88px;border:1px solid rgba(0,0,0,.12);border-radius:10px;padding:10px;font-family:inherit;resize:vertical;box-sizing:border-box;" placeholder="一行一个，或用逗号分隔，例如：&#10;斯卡蒂&#10;幽灵鲨&#10;歌蕾蒂娅"></textarea>
-                <div style="font-size:12px;opacity:.65;line-height:1.5;">论坛生成时优先使用这里的角色名单；留空时才使用当前角色名</div>
+                <div class="rp-set-hint" style="width:100%;line-height:1.5">留空时使用当前角色名；填写后，论坛帖子、评论、回复会优先围绕这里的角色生成。</div>
               </div>
             </div>
 
-            <div class="rp-set-section-title">AI 调试</div>
+            <div class="rp-set-section-title">论坛生成模板</div>
             <div class="rp-set-section">
-              <div class="rp-set-row" style="display:flex;gap:8px;align-items:center">
-                <span class="rp-set-hint">查看最近的 prompt、系统提示词和 AI 原始返回</span>
-                <button id="rp-ai-debug-open" class="rp-set-upload-btn">打开调试</button>
-                <button id="rp-ai-debug-clear" class="rp-set-upload-btn rp-wall-reset-btn">清空</button>
+              <div class="rp-set-row" style="flex-direction:column;align-items:stretch;gap:8px">
+                <div class="rp-set-key" style="width:100%">话题池（topicPool）</div>
+                <textarea id="rp-forum-topic-pool" style="width:100%;min-height:120px;border:1px solid rgba(0,0,0,.12);border-radius:10px;padding:10px;font-family:inherit;resize:vertical;box-sizing:border-box;"></textarea>
+                <div class="rp-set-hint" style="width:100%;line-height:1.5">一行一个话题方向。可用占位符：{{charNamesText}}、{{userName}}、{{charName}}</div>
+              </div>
+              <div class="rp-set-row" style="flex-direction:column;align-items:stretch;gap:8px">
+                <div class="rp-set-key" style="width:100%">主帖生成提示词</div>
+                <textarea id="rp-forum-feed-prompt" style="width:100%;min-height:180px;border:1px solid rgba(0,0,0,.12);border-radius:10px;padding:10px;font-family:inherit;resize:vertical;box-sizing:border-box;"></textarea>
+                <div class="rp-set-hint" style="width:100%;line-height:1.5">可用占位符：{{charNamesText}}、{{userName}}</div>
+              </div>
+              <div class="rp-set-row" style="flex-direction:column;align-items:stretch;gap:8px">
+                <div class="rp-set-key" style="width:100%">评论生成提示词</div>
+                <textarea id="rp-forum-comment-prompt" style="width:100%;min-height:220px;border:1px solid rgba(0,0,0,.12);border-radius:10px;padding:10px;font-family:inherit;resize:vertical;box-sizing:border-box;"></textarea>
+                <div class="rp-set-hint" style="width:100%;line-height:1.5">可用占位符：{{charNamesText}}、{{userName}}、{{relationCtx}}、{{postTitle}}、{{postBody}}</div>
+              </div>
+              <div class="rp-set-row" style="flex-direction:column;align-items:stretch;gap:8px">
+                <div class="rp-set-key" style="width:100%">楼中楼回复提示词</div>
+                <textarea id="rp-forum-reply-prompt" style="width:100%;min-height:220px;border:1px solid rgba(0,0,0,.12);border-radius:10px;padding:10px;font-family:inherit;resize:vertical;box-sizing:border-box;"></textarea>
+                <div class="rp-set-hint" style="width:100%;line-height:1.5">可用占位符：{{charNamesText}}、{{userName}}、{{relationCtx}}、{{recentComments}}、{{userComment}}</div>
+              </div>
+              <div class="rp-set-row" style="justify-content:flex-end">
+                <button id="rp-forum-prompts-reset" class="rp-set-upload-btn">恢复默认论坛模板</button>
               </div>
             </div>
 
           </div>
-        </div>
-
-        <div id="rp-view-ai-debug" class="rp-view" style="display:none;flex-direction:column">
-          <div class="rp-nav-bar">
-            <button class="rp-back" data-to="settings">‹</button>
-            <span class="rp-nav-title">AI 调试</span>
-            <button id="rp-ai-debug-clear-top" class="rp-nav-add" style="font-size:14px;font-weight:600">清空</button>
-          </div>
-          <div id="rp-ai-debug-list" style="overflow-y:auto;flex:1;padding-bottom:16px"></div>
         </div>
 
         <!-- 2048 游戏 -->
@@ -5841,6 +5768,12 @@ async function init() {
     STATE.notifications = saved.notifications || [];
     STATE.sync = saved.sync || { stage: 1, progress: 0, status: '乖巧' };
     STATE.moments = saved.moments || [];
+    STATE.xhsFeed = saved.xhsFeed || [];
+    STATE.forumCharNamesText = saved.forumCharNamesText || '';
+    STATE.forumTopicPoolText = saved.forumTopicPoolText || '';
+    STATE.forumFeedPromptText = saved.forumFeedPromptText || '';
+    STATE.forumCommentPromptText = saved.forumCommentPromptText || '';
+    STATE.forumReplyPromptText = saved.forumReplyPromptText || '';
     STATE.avatars = saved.avatars || {};
     STATE.darkMode = saved.darkMode || false;
     // 恢复上次停留的界面(仅限同一 session 内,刷新页面后回锁屏)
@@ -6411,7 +6344,10 @@ function onChatChanged() {
       diary:   JSON.parse(JSON.stringify(_safeDiary2)),
       xhsFeed: JSON.parse(JSON.stringify(STATE.xhsFeed || [])),
       forumCharNamesText: STATE.forumCharNamesText || '',
-      aiDebugLogs: (STATE.aiDebugLogs || []).slice(0, 30),
+      forumTopicPoolText: STATE.forumTopicPoolText || '',
+      forumFeedPromptText: STATE.forumFeedPromptText || '',
+      forumCommentPromptText: STATE.forumCommentPromptText || '',
+      forumReplyPromptText: STATE.forumReplyPromptText || '',
       avatars: Object.assign({}, STATE.avatars || {}),
       bankData: STATE.bankData ? JSON.parse(JSON.stringify(STATE.bankData)) : null,
     };
@@ -6433,9 +6369,12 @@ function onChatChanged() {
     STATE.sync = { ...s.sync };
     STATE.moments = JSON.parse(JSON.stringify(s.moments || []));
     STATE.diary   = JSON.parse(JSON.stringify(s.diary   || []));
-    STATE.xhsFeed = JSON.parse(JSON.stringify(s.xhsFeed || []));
+    STATE.xhsFeed  = JSON.parse(JSON.stringify(s.xhsFeed || []));
     STATE.forumCharNamesText = s.forumCharNamesText || '';
-    STATE.aiDebugLogs = s.aiDebugLogs || aiDebugLoadLogs();
+    STATE.forumTopicPoolText = s.forumTopicPoolText || '';
+    STATE.forumFeedPromptText = s.forumFeedPromptText || '';
+    STATE.forumCommentPromptText = s.forumCommentPromptText || '';
+    STATE.forumReplyPromptText = s.forumReplyPromptText || '';
     STATE.avatars = Object.assign({}, s.avatars || {});
     STATE.currentThread = s.currentThread;
     STATE.bankData = s.bankData ? JSON.parse(JSON.stringify(s.bankData)) : null;
@@ -6449,7 +6388,10 @@ function onChatChanged() {
       STATE.diary = persisted.diary || [];
       STATE.xhsFeed = persisted.xhsFeed || [];
       STATE.forumCharNamesText = persisted.forumCharNamesText || '';
-      STATE.aiDebugLogs = persisted.aiDebugLogs || aiDebugLoadLogs();
+      STATE.forumTopicPoolText = persisted.forumTopicPoolText || '';
+      STATE.forumFeedPromptText = persisted.forumFeedPromptText || '';
+      STATE.forumCommentPromptText = persisted.forumCommentPromptText || '';
+      STATE.forumReplyPromptText = persisted.forumReplyPromptText || '';
       STATE.avatars = persisted.avatars || {};
       STATE.bankData = persisted.bankData || null;
       STATE.currentThread = null;
@@ -6459,9 +6401,12 @@ function onChatChanged() {
       STATE.sync = { stage: 1, progress: 0, status: '乖巧' };
       STATE.moments = [];
       STATE.diary   = [];
-      STATE.xhsFeed = [];
+      STATE.xhsFeed  = [];
       STATE.forumCharNamesText = '';
-      STATE.aiDebugLogs = aiDebugLoadLogs();
+      STATE.forumTopicPoolText = '';
+      STATE.forumFeedPromptText = '';
+      STATE.forumCommentPromptText = '';
+      STATE.forumReplyPromptText = '';
       STATE.avatars = {};
       STATE.bankData = null;
       STATE.currentThread = null;
@@ -6737,6 +6682,26 @@ function bindUI() {
     renderXHSFeed(true);
   });
 
+  $(document).on('input', '#rp-forum-char-names, #rp-forum-topic-pool, #rp-forum-feed-prompt, #rp-forum-comment-prompt, #rp-forum-reply-prompt', function() {
+    const id = this.id;
+    const val = $(this).val() || '';
+    if (id === 'rp-forum-char-names') STATE.forumCharNamesText = val;
+    else if (id === 'rp-forum-topic-pool') STATE.forumTopicPoolText = val;
+    else if (id === 'rp-forum-feed-prompt') STATE.forumFeedPromptText = val;
+    else if (id === 'rp-forum-comment-prompt') STATE.forumCommentPromptText = val;
+    else if (id === 'rp-forum-reply-prompt') STATE.forumReplyPromptText = val;
+    saveState();
+  });
+
+  $(document).on('click', '#rp-forum-prompts-reset', function() {
+    STATE.forumTopicPoolText = DEFAULT_FORUM_TOPIC_POOL_TEXT;
+    STATE.forumFeedPromptText = DEFAULT_FORUM_FEED_PROMPT_TEXT;
+    STATE.forumCommentPromptText = DEFAULT_FORUM_COMMENT_PROMPT_TEXT;
+    STATE.forumReplyPromptText = DEFAULT_FORUM_REPLY_PROMPT_TEXT;
+    fillForumSettingsInputs();
+    saveState();
+  });
+
   // 银行卡 - 刷新按钮
   $(document).on('click', '#rp-bank-refresh', function() {
     generateBankData(true);
@@ -6759,20 +6724,6 @@ function bindUI() {
     $('.rp-xhs-tag-btn').removeClass('rp-xhs-tag-selected');
     $(this).addClass('rp-xhs-tag-selected');
     STATE.xhsSelectedTag = $(this).data('tag');
-  });
-
-  $(document).on('input', '#rp-forum-char-names', function() {
-    STATE.forumCharNamesText = $(this).val() || '';
-    saveState();
-  });
-
-  $(document).on('click', '#rp-ai-debug-open', function() {
-    renderAIDebugView();
-    go('ai-debug');
-  });
-
-  $(document).on('click', '#rp-ai-debug-clear, #rp-ai-debug-clear-top', function() {
-    aiDebugClear();
   });
 
   // 小红书 - 发布帖子
@@ -7692,7 +7643,7 @@ function go(view) {
   if (view === 'themes') { lgRenderThemePicker(); }
   $('.rp-view').hide();
   // 需要 flex 布局的视图
-  const flexViews = ['xhs','xhs-detail','xhs-compose','theme-studio','ai-debug'];
+  const flexViews = ['xhs','xhs-detail','xhs-compose','theme-studio'];
   if (flexViews.includes(view)) {
     $(`#rp-view-${view}`).css('display','flex');
   } else {
@@ -7703,11 +7654,7 @@ function go(view) {
   // 切换到 home 时重置到第0屏
   if (view === 'home' && window._rpHomeSwipeGoto) { window._rpHomeSwipeGoto(0, false); }
 
-  if (view === 'settings') {
-    _bindAvatarUpload();
-    const _forumTa = document.getElementById('rp-forum-char-names');
-    if (_forumTa) _forumTa.value = STATE.forumCharNamesText || '';
-  }
+  if (view === 'settings') { _bindAvatarUpload(); fillForumSettingsInputs(); }
 
   if (view === 'messages') {
     renderThreadList();
@@ -7719,9 +7666,6 @@ function go(view) {
   if (view === 'xhs') {
     mergeGlobalAvatars();
     renderXHSFeed(false);
-  }
-  if (view === 'ai-debug') {
-    renderAIDebugView();
   }
   if (view === 'bank') {
     renderBankView();
@@ -9867,6 +9811,7 @@ function _bindAvatarUpload() {
 function openSettings() {
   populateAvatarSelect();
   updateAvatarPreviewSwatch($('#rp-avatar-select').val());
+  fillForumSettingsInputs();
   go('settings');
 }
 
@@ -9899,6 +9844,134 @@ function updateAvatarPreviewSwatch(who) {
     const th = Object.values(STATE.threads).find(t => t.name === who);
     swatch.text(th ? th.initials : who.slice(0,2).toUpperCase()).css('background', th ? th.avatarBg : 'linear-gradient(145deg,#555,#333)');
   }
+}
+
+const DEFAULT_FORUM_TOPIC_POOL_TEXT = [
+  '围绕{{charNamesText}}之间关系的八卦讨论',
+  '关于{{charNamesText}}其中一人的生活或性格传闻',
+  '{{charNamesText}}在社交圈里的评价与见闻',
+  '围绕{{charNamesText}}某次公开互动的讨论',
+  '有人目击{{charNamesText}}其中两人一起出现后的猜测',
+  '关于{{charNamesText}}过去经历被翻出来讨论',
+  '旁观者对{{charNamesText}}关系变化的观察',
+  '围绕{{charNamesText}}之一的外形、气质、作风的闲聊',
+  '关于{{charNamesText}}中某人的传闻和不同看法',
+  '讨论{{charNamesText}}之间微妙气氛的一条帖子'
+].join('\n');
+
+const DEFAULT_FORUM_FEED_PROMPT_TEXT = `你是一个论坛帖子生成器。严格按要求生成3条帖子，每条帖子独立，内容和评论不能重复。
+
+本次帖子可能涉及的角色有：{{charNamesText}}
+你可以：
+- 任选其中1个角色作为帖子核心
+- 或选择其中2到3个角色之间的互动/关系作为帖子核心
+- 不要求每条帖子都提到全部角色
+
+帖子要求：
+- 话题严格对应下方给出的3个不同方向
+- 采用普通网友发帖视角，像围观者、旁观者、路人、熟人、知情人发帖
+- 标题简洁明确，像论坛标题
+- 正文40到90字，口语化，自然
+- 不要写成小红书、短视频、营销号文案
+- 可以八卦、猜测、观察、吐槽，但不要太浮夸
+
+评论要求（每条帖子各自生成5条）：
+- 评论像论坛回帖
+- 可以包含：共鸣、追问、补充经历、吐槽、质疑、分析、站队
+- 每条评论都要像不同的人说话
+- 评论内容和昵称都不能重复
+
+只返回JSON数组，格式如下：
+[{"user":"昵称","tag":"标签","title":"标题","body":"正文","likes":数字,"comments":[{"user":"昵称","text":"评论内容"}]}]
+
+共3条，不要有任何解释文字。
+重要：字段值内部不要出现英文双引号。`;
+
+const DEFAULT_FORUM_COMMENT_PROMPT_TEXT = `你是一个论坛回帖生成器。以下帖子是由用户{{userName}}本人发的，请模拟5位风格不同的陌生网友回帖。
+
+帖子可能涉及这些角色中的一个或多个：
+{{charNamesText}}
+
+理解要求：
+- 帖子里的“我”表示发帖人{{userName}}自己
+- 上面列出的角色，可能是帖子里提到、暗示、讨论或关联到的人
+- 请根据帖子内容、背景资料和近期对话判断帖子在说谁，不要强行把所有角色都写进去
+- 不要臆造无关第三人
+
+{{relationCtx}}
+
+回帖要求：
+- 每条都要紧扣帖子标题和正文
+- 更像论坛用户回帖，不要像小红书短评
+- 可以包含建议、共鸣、追问、吐槽、补充信息、轻微质疑
+- 如果帖子明显在讨论某个角色或几个人的关系，可以自然提到他们名字
+- 每条15到35字，口语化，自然
+- 5条语气要有区别，不要像一个人连发
+
+只返回JSON：
+[{"user":"昵称","text":"评论内容"}]`;
+
+const DEFAULT_FORUM_REPLY_PROMPT_TEXT = `你是论坛楼中楼回复生成器。根据帖子内容和用户评论，生成3条自然贴切的陌生网友回复。
+
+本帖可能涉及这些角色中的一个或多个：
+{{charNamesText}}
+
+要求：
+- 3条回复必须紧扣帖子主题和用户说的话
+- 要根据上下文判断当前主要在讨论哪个角色或哪几个人
+- 不要每条都强行把全部角色写进去
+- 风格要有区别，比如追问、补充、反驳、共鸣、调侃、提醒
+- 更像论坛里的连续回复，不要写成小红书评论风
+- 每条15到30字，口语化，自然
+- 不要让3条回复像同一个人说的
+
+{{relationCtx}}
+
+只返回JSON数组：
+[{"user":"昵称","text":"回复内容"},{"user":"昵称","text":"回复内容"},{"user":"昵称","text":"回复内容"}]`;
+
+function getManualForumCharNames() {
+  return String(STATE.forumCharNamesText || '')
+    .split(/[\n,，、]+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+function renderForumTemplate(str, vars) {
+  return String(str || '').replace(/\{\{(\w+)\}\}/g, function(_, key) {
+    return vars && vars[key] != null ? String(vars[key]) : '';
+  });
+}
+
+function getForumTopicPoolTemplates() {
+  const raw = String(STATE.forumTopicPoolText || DEFAULT_FORUM_TOPIC_POOL_TEXT || '');
+  return raw.split(/\n+/).map(s => s.trim()).filter(Boolean);
+}
+
+function getForumFeedPromptTemplate() {
+  return String(STATE.forumFeedPromptText || DEFAULT_FORUM_FEED_PROMPT_TEXT || '');
+}
+
+function getForumCommentPromptTemplate() {
+  return String(STATE.forumCommentPromptText || DEFAULT_FORUM_COMMENT_PROMPT_TEXT || '');
+}
+
+function getForumReplyPromptTemplate() {
+  return String(STATE.forumReplyPromptText || DEFAULT_FORUM_REPLY_PROMPT_TEXT || '');
+}
+
+function fillForumSettingsInputs() {
+  const map = {
+    'rp-forum-char-names': STATE.forumCharNamesText || '',
+    'rp-forum-topic-pool': STATE.forumTopicPoolText || DEFAULT_FORUM_TOPIC_POOL_TEXT,
+    'rp-forum-feed-prompt': STATE.forumFeedPromptText || DEFAULT_FORUM_FEED_PROMPT_TEXT,
+    'rp-forum-comment-prompt': STATE.forumCommentPromptText || DEFAULT_FORUM_COMMENT_PROMPT_TEXT,
+    'rp-forum-reply-prompt': STATE.forumReplyPromptText || DEFAULT_FORUM_REPLY_PROMPT_TEXT,
+  };
+  Object.keys(map).forEach(function(id) {
+    const el = document.getElementById(id);
+    if (el) el.value = map[id];
+  });
 }
 
 // ================================================================
@@ -11130,7 +11203,7 @@ async function _doGetMomentsCtx() {
 
   // 近30条对话(足够捕捉 NPC 语气)
   const recentChat = (ctx?.chat || []).slice(-30).map(m => {
-    const spk = m.is_user ? userName : (m.name || charNames[0] || 'TA');
+    const spk = m.is_user ? userName : (m.name || charName);
     return spk + ': ' + ((m.mes || '').replace(/<[^>]+>/g, '').trim().slice(0, 150));
   }).join('\n') || '(暂无对话记录)';
   // 提取主角人设(description + personality + scenario)
@@ -12125,7 +12198,7 @@ async function generateBankData(force) {
 
     // 近期对话（扩展到30条，每条保留更多内容）
     const chatMsgs = (rawCtx?.chat || []).slice(-30).map(m => {
-      const spk = m.is_user ? userName : (m.name || charNames[0] || 'TA');
+      const spk = m.is_user ? userName : (m.name || charName);
       return spk + ': ' + ((m.mes || '').replace(/<[^>]+>/g, '').trim().slice(0, 300));
     }).join('\n') || '（暂无对话记录）';
 
@@ -12230,24 +12303,23 @@ async function buildXHSFeedWithAI(appendMode) {
   const userPosts = (STATE.xhsFeed || []).filter(p => p.from === 'user');
   const existingStranger = (STATE.xhsFeed || []).filter(p => p.from !== 'user');
 
-  // 读角色信息
-  let charName = '', userName = '', charPersona = '', recentChat = '';
+  let userName = '用户';
+  let recentChat = '';
+  const ctx0 = getContext() || {};
   try {
     const ctx = await getMomentsCtx();
-    charName = ctx.charName || ''; userName = ctx.userName || '';
-    charPersona = ctx.charPersona || ''; recentChat = ctx.recentChat || '';
+    userName = ctx.userName || userName;
+    recentChat = ctx.recentChat || '';
   } catch(e) {
-    const ctx0 = getContext() || {};
-    charName = ctx0?.name2 || ctx0?.name || 'TA';
     userName = ctx0?.name1 || '用户';
   }
-  const ctxXhs = getContext() || {};
-  const charNames = getForumCharNamesForContext(ctxXhs);
-  const charNamesText = charNames.join('、') || charName || 'TA';
+  const fallbackName = ctx0?.name2 || ctx0?.name || 'TA';
+  const manualNames = getManualForumCharNames();
+  const charNames = manualNames.length ? manualNames : [fallbackName].filter(Boolean);
+  const charNamesText = charNames.join('、') || 'TA';
+  const personaCtx = lgGetPersona() || `角色名单:${charNamesText}`;
 
-  // 合并新帖子到列表(追加模式:新帖插到陌生人帖子最前面,超10条删最旧的)
   function mergeNewPosts(newPosts) {
-    // 记录本次耗时（成功路径）
     try {
       const elapsed = Date.now() - xhsGenStart;
       const hist = JSON.parse(localStorage.getItem(XHS_TIMER_KEY) || '[]');
@@ -12257,66 +12329,35 @@ async function buildXHSFeedWithAI(appendMode) {
     } catch(e) {}
     _xhsClearEtaTimer();
     const MAX_STRANGER = 10;
-    let merged = [...newPosts, ...existingStranger]; // 新的在前
-    if (merged.length > MAX_STRANGER) merged = merged.slice(0, MAX_STRANGER); // 删最旧
+    let merged = [...newPosts, ...existingStranger];
+    if (merged.length > MAX_STRANGER) merged = merged.slice(0, MAX_STRANGER);
     STATE.xhsFeed = [...userPosts, ...merged];
     saveState();
     _renderXHSList();
-    // 滚到顶部
     setTimeout(() => { const box = $('#rp-xhs-list'); if (box.length) box.scrollTop(0); }, 50);
   }
 
-  // 随机选3个话题方向,保证每次刷新内容不重复
-  const topicPool = [
+  const topicTemplates = getForumTopicPoolTemplates();
+  const topicPool = topicTemplates.map(t => renderForumTemplate(t, {
+    charNamesText,
+    userName,
+    charName: fallbackName,
+  })).filter(Boolean);
+  const pick3 = (arr) => { const a=[...arr].sort(()=>Math.random()-0.5); return a.slice(0,3); };
+  const chosenTopics = pick3(topicPool.length ? topicPool : [
     `围绕${charNamesText}之间关系的八卦讨论`,
     `关于${charNamesText}其中一人的生活或性格传闻`,
-    `${charNamesText}在社交圈里的评价与见闻`,
-    `围绕${charNamesText}某次公开互动的讨论`,
-    `有人目击${charNamesText}其中两人一起出现后的猜测`,
-    `关于${charNamesText}过去经历被翻出来讨论`,
-    `旁观者对${charNamesText}关系变化的观察`,
-    `围绕${charNamesText}之一的外形、气质、作风的闲聊`,
-    `关于${charNamesText}中某人的传闻和不同看法`,
-    `讨论${charNamesText}之间微妙气氛的一条帖子`,
-  ];
-  const pick3 = (arr) => { const a=[...arr].sort(()=>Math.random()-0.5); return a.slice(0,3); };
-  const chosenTopics = pick3(topicPool);
+    `${charNamesText}在社交圈里的评价与见闻`
+  ]);
 
   try {
-    const sysMsg = `你是一个论坛帖子生成器。严格按要求生成3条帖子，每条帖子独立，内容和评论不能重复。
+    const sysMsg = renderForumTemplate(getForumFeedPromptTemplate(), {
+      charNamesText,
+      userName,
+      charName: fallbackName,
+    });
 
-本次帖子可能涉及的角色有：${charNamesText}
-你可以：
-- 任选其中1个角色作为帖子核心
-- 或选择其中2到3个角色之间的互动/关系作为帖子核心
-- 不要求每条帖子都提到全部角色
-
-帖子要求：
-- 话题严格对应下方给出的3个不同方向
-- 采用普通网友发帖视角，像围观者、旁观者、路人、熟人、知情人发帖
-- 标题简洁明确，像论坛标题
-- 正文40到90字，口语化，自然
-- 不要写成小红书、短视频、营销号文案
-- 可以八卦、猜测、观察、吐槽，但不要太浮夸
-
-评论要求（每条帖子各自生成5条）：
-- 评论像论坛回帖
-- 可以包含：共鸣、追问、补充经历、吐槽、质疑、分析、站队
-- 每条评论都要像不同的人说话
-- 评论内容和昵称都不能重复
-
-只返回JSON数组，格式如下：
-[{"user":"昵称","tag":"标签","title":"标题","body":"正文","likes":数字,"comments":[{"user":"昵称","text":"评论内容"}]}]
-
-共3条，不要有任何解释文字。
-重要：字段值内部不要出现英文双引号。`;
-
-    const personaCtx = lgGetPersona() || charPersona || `角色名单:${charNamesText}`;
-    const richRecentChat = (ctxXhs?.chat || []).slice(-20).map(m => {
-      const spk = m.is_user ? (ctxXhs?.name1 || userName || '用户') : (m.name || charNames[0] || charName || 'TA');
-      return spk + ': ' + String(m.mes || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 220);
-    }).filter(Boolean).join('\n');
-    const prompt = `角色完整设定:\n${personaCtx}\n\n用户名:${userName}\n近期对话片段:\n${richRecentChat || (recentChat || '').slice(0, 2000)}\n\n本次3条帖子话题方向:\n${chosenTopics.map((t,i)=>`${i+1}. ${t}`).join('\n')}\n\n生成JSON:`;
+    const prompt = `【角色完整设定】\n${personaCtx}\n\n【近期对话片段】\n${recentChat || '(暂无对话记录)'}\n\n【本次3条帖子话题方向】\n${chosenTopics.map((t,i)=>`${i+1}. ${t}`).join('\n')}\n\n请生成JSON:`;
 
     const resp = await xhsCallAPI(prompt, sysMsg);
     console.log('[XHS] raw resp:', resp ? resp.slice(0, 300) : 'null');
@@ -12326,10 +12367,8 @@ async function buildXHSFeedWithAI(appendMode) {
         let jsonStr = resp.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
         const m = jsonStr.match(/\[[\s\S]*\]/);
         if (m) jsonStr = m[0];
-        // 修复 AI 在字符串值里用双引号的问题(如 "Theo")
-        // 策略:逐字符状态机,在 JSON 字符串值内遇到未转义双引号时替换为「」
         jsonStr = (function fixInnerQuotes(s) {
-          let out = '', inStr = false, key = false, i = 0;
+          let out = '', inStr = false, i = 0;
           while (i < s.length) {
             const ch = s[i];
             if (!inStr) {
@@ -12338,10 +12377,9 @@ async function buildXHSFeedWithAI(appendMode) {
             } else {
               if (ch === '\\') { out += ch + (s[i+1]||''); i += 2; continue; }
               if (ch === '"') {
-                // 判断是结束引号还是内部引号:后面紧跟 : , } ] 或空白+这些字符
                 const rest = s.slice(i+1).trimStart();
                 if (/^[:\],}]/.test(rest)) { inStr = false; out += ch; }
-                else { out += '\u2019'; } // 替换为右单引号 '
+                else { out += '\u2019'; }
               } else { out += ch; }
             }
             i++;
@@ -12358,7 +12396,7 @@ async function buildXHSFeedWithAI(appendMode) {
           return {
             id: `xhs_ai_${Date.now()}_${i}`, from: 'stranger',
             user: p.user||`路人${i+1}🌿`, title: p.title||'', body: p.body||'',
-            tag: p.tag||'八卦', likes: typeof p.likes==='number' ? p.likes : rndInt(500,20000),
+            tag: p.tag||'讨论', likes: typeof p.likes==='number' ? p.likes : rndInt(500,20000),
             likedByUser: false, comments: aiComments, time: ts(), date: todayStr,
           };
         });
@@ -12368,7 +12406,6 @@ async function buildXHSFeedWithAI(appendMode) {
     }
   } catch(e) { console.error('[XHS] AI feed build EXCEPTION:', e); }
 
-  // AI 失败 → 显示错误提示,让用户刷新重试(不用 fallback 池避免重复)
   _xhsClearEtaTimer();
   $('#rp-xhs-loading').remove();
   const box = $('#rp-xhs-list');
@@ -12522,53 +12559,35 @@ async function generateXHSStrangerComments(postId) {
   const post = (STATE.xhsFeed || []).find(p => p.id === postId);
   if (!post || post.from !== 'user') return;
   const ctx = getContext() || {};
-  const charNames = getForumCharNamesForContext(ctx);
+  const fallbackName = ctx?.name2 || ctx?.name || 'TA';
+  const manualNames = getManualForumCharNames();
+  const charNames = manualNames.length ? manualNames : [fallbackName].filter(Boolean);
   const charNamesText = charNames.join('、') || 'TA';
-  const fallbackCharName = charNames[0] || 'TA';
   const userName = ctx?.name1 || '楼主';
 
-  // 读取更完整的角色设定 + 更长的近期对话
-  const personaCtx = lgGetPersona() || '';
-  const recentChat = (ctx?.chat || []).slice(-20).map(m => {
-    const spk = m.is_user ? userName : (m.name || fallbackCharName);
-    return spk + ': ' + String(m.mes || '').replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim().slice(0,220);
-  }).filter(Boolean).join('\n');
+  const personaCtx = lgGetPersona() || `角色名单:${charNamesText}`;
+  const recentChat = (ctx?.chat || []).slice(-25).map(m => {
+    const spk = m.is_user ? userName : (m.name || fallbackName);
+    return spk + ': ' + (m.mes || '').replace(/<[^>]+>/g,'').trim().slice(0,220);
+  }).join('\n');
 
   const relationCtx = [
     personaCtx ? `【角色完整设定】\n${personaCtx}` : '',
-    recentChat ? `【近期对话片段】\n${recentChat}`  : '',
-  ].filter(Boolean).join('\n');
+    recentChat ? `【近期对话片段】\n${recentChat}` : '',
+  ].filter(Boolean).join('\n\n');
 
-  const sysMsg = `你是一个论坛回帖生成器。以下帖子是由用户${userName}本人发的，请模拟5位性格各异的陌生网友评论。
+  const sysMsg = renderForumTemplate(getForumCommentPromptTemplate(), {
+    userName,
+    charNamesText,
+    charName: fallbackName,
+    relationCtx,
+    postTitle: post.title || '',
+    postBody: post.body || '',
+  });
 
-人物关系说明(严格遵守,不能混淆):
-- 帖子里的"我"表示发帖人${userName}自己
-- 帖子可能涉及这些角色中的一个或多个：${charNamesText}
-- 请根据下方【角色背景】和【近期对话片段】判断帖子中出现的亲属/关系称谓(如"我爸""我父亲""我男友"等)究竟对应谁；如果背景已明确说明相关关系，则以背景为准，不得臆造第三人
-- 评论者是不认识${userName}的陌生网友，他们通过帖子内容来理解人物关系
-
-${relationCtx ? relationCtx + '\n' : ''}
-评论要求:
-- 每条评论必须紧扣帖子实际内容，不能搞错人物关系
-- 评论有实质内容，不只是"坐等后续"空话
-- 可以自然点出${charNamesText}中与帖子最相关的人，但不要每条都强行把所有人写进去
-
-性格类型(各一条):
-1. 吃瓜补料型:结合帖子内容补充信息或目击经历
-2. 担心共情型:针对帖子情境表达具体担忧
-3. 阴阳怪气型:用正常语气阴阳,有具体所指
-4. 无脑力挺型:支持${userName}立场,情绪化但有观点
-5. 猜测爆瓜型:点出最相关角色名字,八卦语气
-
-每条15-30字,口语化,带emoji昵称。
-只返回JSON:[{"user":"昵称","text":"评论内容"}]`;
-
-  const prompt = `帖子标题:${post.title}\n帖子内容:${post.body}`;
-  const resp = await lgCallAPI(prompt, 400, sysMsg);
-  if (!resp) {
-    // API 失败:静默处理,不用假评论充数
-    return;
-  }
+  const prompt = `帖子标题:${post.title}\n帖子内容:${post.body}\n\n请返回评论JSON:`;
+  const resp = await lgCallAPI(prompt, 500, sysMsg);
+  if (!resp) return;
 
   let items = [];
   try {
@@ -12587,7 +12606,6 @@ ${relationCtx ? relationCtx + '\n' : ''}
     post.comments.push({ from: 'stranger_'+i, user: item.user, text: item.text, time: ts, replyTo: null });
   });
   saveState();
-  // 如果当前正在看这篇帖子的详情页,刷新评论区
   if (STATE.currentView === 'xhs-detail' && STATE.xhsCurrentPost === postId) {
     renderXHSDetail(post);
   }
@@ -12617,35 +12635,35 @@ async function generateXHSReplyToComment(postId, userComment, userName) {
   const post = (STATE.xhsFeed || []).find(p => p.id === postId);
   if (!post) return;
   const ctx = getContext() || {};
-  const charNames = getForumCharNamesForContext(ctx);
+  const fallbackName = ctx?.name2 || ctx?.name || 'TA';
+  const manualNames = getManualForumCharNames();
+  const charNames = manualNames.length ? manualNames : [fallbackName].filter(Boolean);
   const charNamesText = charNames.join('、') || 'TA';
-  const fallbackCharName = charNames[0] || 'TA';
-  const recentComments = (post.comments||[]).slice(-5).map(c=>`${c.user}:${c.text}`).join('\n');
+  const recentComments = (post.comments||[]).slice(-8).map(c=>`${c.user}:${c.text}`).join('\n');
 
-  // 读取更完整的角色设定 + 更长的近期对话
-  const personaCtx = lgGetPersona() || '';
+  const personaCtx = lgGetPersona() || `角色名单:${charNamesText}`;
   const recentChatSnippet = (ctx?.chat || []).slice(-20).map(m => {
-    const spk = m.is_user ? userName : (m.name || fallbackCharName);
-    return spk + ': ' + String(m.mes || '').replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim().slice(0,220);
-  }).filter(Boolean).join('\n');
+    const spk = m.is_user ? userName : (m.name || fallbackName);
+    return spk + ': ' + (m.mes || '').replace(/<[^>]+>/g,'').trim().slice(0,180);
+  }).join('\n');
 
   const relationCtx = [
     personaCtx ? `【角色完整设定】\n${personaCtx}` : '',
     recentChatSnippet ? `【近期对话】\n${recentChatSnippet}` : '',
-  ].filter(Boolean).join('\n');
+  ].filter(Boolean).join('\n\n');
 
-  const sysMsg = `你是论坛楼中楼回复生成器。根据帖子内容和用户评论,生成3个自然贴切的陌生网友回复。
-要求:
-- 3条回复必须紧扣帖子主题和用户说的话,不能答非所问
-- 3条风格各异(如追问细节、调侃起哄、加料补充、共情、质疑等),根据帖子和评论内容自然选择
-- 每条15-25字,口语化论坛回复风格,昵称自然
-帖子背景:可能涉及这些角色中的一个或多个：${charNamesText}。请根据下方背景资料判断帖子中出现的亲属/关系称谓实际对应谁,以背景为准,不得臆造第三人，也不要每条都强行提到全部角色。
-${relationCtx ? '\n' + relationCtx + '\n' : ''}
-只返回JSON数组:[{"user":"昵称","text":"回复内容"},{"user":"昵称","text":"回复内容"},{"user":"昵称","text":"回复内容"}]`;
+  const sysMsg = renderForumTemplate(getForumReplyPromptTemplate(), {
+    userName,
+    charNamesText,
+    charName: fallbackName,
+    relationCtx,
+    recentComments,
+    userComment,
+  });
 
   const prompt = `帖子标题:${post.title}\n近期评论:\n${recentComments}\n用户${userName}刚说:「${userComment}」\n生成3条回复JSON:`;
 
-  const resp = await lgCallAPI(prompt, 300, sysMsg);
+  const resp = await lgCallAPI(prompt, 360, sysMsg);
   if (!resp) return;
 
   let replies = [];
@@ -12653,7 +12671,6 @@ ${relationCtx ? '\n' + relationCtx + '\n' : ''}
     const m = resp.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim().match(/\[[\s\S]*\]/);
     if (m) replies = JSON.parse(m[0]);
   } catch(e) {
-    // fallback:尝试单条
     try {
       const m2 = resp.match(/\{[\s\S]*?\}/g);
       if (m2) replies = m2.map(s => { try { return JSON.parse(s); } catch(e2) { return null; } }).filter(Boolean);
@@ -12661,32 +12678,27 @@ ${relationCtx ? '\n' + relationCtx + '\n' : ''}
   }
   if (!replies.length) return;
 
-  // 找到用户刚才那条评论的 index
   const _revIdx = [...post.comments].reverse().findIndex(c => c.from === 'user');
   const userCidx = _revIdx >= 0 ? post.comments.length - 1 - _revIdx : null;
 
-  // 错峰推送:0s / 1.5s / 3.5s
-  const delays = [0, 1500, 3500];
-  replies.slice(0, 3).forEach((r, i) => {
+  [0, 1500, 3500].forEach((delay, i) => {
+    const item = replies[i];
+    if (!item || !item.user || !item.text) return;
     setTimeout(() => {
       const p2 = (STATE.xhsFeed || []).find(x => x.id === postId);
       if (!p2) return;
       const now = new Date();
       const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-      const nick = r.user || '路人甲';
-      const replyText = (r.text || '').trim();
-      if (!replyText) return;
-      const refIdx = (userCidx !== null && userCidx < p2.comments.length) ? userCidx : null;
-      p2.comments.push({ from: 'stranger_reply', user: nick, text: replyText, time: ts, replyTo: refIdx });
+      p2.comments = p2.comments || [];
+      p2.comments.push({ from:'stranger_reply_'+i, user:item.user, text:item.text, time:ts, replyTo:userCidx });
       saveState();
       if (STATE.currentView === 'xhs-detail' && STATE.xhsCurrentPost === postId) {
         renderXHSDetail(p2);
       }
-    }, delays[i]);
+    }, delay);
   });
 }
 
-// XHS 点赞切换
 function toggleXHSLike(postId) {
   const post = (STATE.xhsFeed || []).find(p => p.id === postId);
   if (!post) return;
@@ -13070,11 +13082,11 @@ function g2048GetPersona() {
     if (description) parts.push('人设:' + description.substring(0, 600));
     // scenario 前 300 字(场景/背景)
     var scenario = (char.scenario || '').trim();
-    if (scenario) parts.push('场景背景:' + scenario.substring(0, 300));
+    if (scenario) parts.push('场景背景:' + scenario);
     // mes_example 对话样例前 150 字(只取语气样本,过滤纯触发词内容)
     var example = (char.mes_example || char.first_mes || '').trim();
     var exampleClean = example.replace(/「[A-Z_a-z]+」/g, '').replace(/\s+/g, ' ').trim();
-    if (exampleClean.length > 20) parts.push('说话语气示例:' + exampleClean.substring(0, 150));
+    if (exampleClean.length > 20) parts.push('说话语气示例:' + exampleClean.substring(0, 500));
     // World Info(已激活词条 + 全量扫描,取与角色相关部分)
     var wiText = _collectWorldInfoText(charName);
     if (wiText) parts.push('世界设定补充:\n' + wiText);
@@ -15110,9 +15122,7 @@ function lgGetPersona() {
     if (personality) parts.push('性格:' + personality);
     const description = (char.description || '').replace(/\s+/g, ' ').trim();
     if (description) {
-      // description 可能前半段全是外貌，后半段才是性格/关系
-      // 策略：取完整 description 前1200字，让模型自己识别性格部分
-      parts.push('人设:' + description.substring(0, 1200));
+      parts.push('人设:' + description);
     }
     const scenario = (char.scenario || '').replace(/\s+/g, ' ').trim();
     if (scenario) parts.push('场景背景:' + scenario.substring(0, 300));
@@ -15180,9 +15190,7 @@ function lgGetPersona() {
 // ── 自定义 API 调用(支持 DeepSeek / 通义 / GLM 等 OpenAI 兼容格式)──
 async function lgCallAPI(prompt, maxTokens = 150, sysMsg = '') {
   const cfg = (() => { try { return JSON.parse(localStorage.getItem('rp_ludo_api') || '{}'); } catch(e) { return {}; } })();
-  const promptText = typeof prompt === 'string' ? prompt : aiDebugPreview(prompt, 50000);
-  const providerBase = (cfg.mode === 'custom' && cfg.url && cfg.key) ? 'custom' : 'st_generateRaw';
-  console.log('[LudoAPI] mode:', cfg.mode, '| promptLen:', promptText.length, '| maxTokens:', maxTokens);
+  console.log('[LudoAPI] mode:', cfg.mode, '| promptLen:', (typeof prompt === 'string' ? prompt : JSON.stringify(prompt)).length, '| maxTokens:', maxTokens);
 
   // 用户设置了自定义 API → 只用自定义,绝不 fallback 到 ST
   if (cfg.mode === 'custom' && cfg.url && cfg.key) {
@@ -15205,29 +15213,9 @@ async function lgCallAPI(prompt, maxTokens = 150, sysMsg = '') {
       const text = data.choices?.[0]?.message?.content?.trim();
       console.log('[LudoAPI] custom API raw response:', JSON.stringify(data).slice(0, 400));
       console.log('[LudoAPI] custom API extracted text:', JSON.stringify(text));
-      aiDebugPush({
-        source: 'lgCallAPI',
-        provider: providerBase,
-        status: text ? 'ok' : 'empty',
-        maxTokens,
-        sysMsg,
-        prompt: promptText,
-        rawResponse: aiDebugPreview(data, 50000),
-        finalText: text || ''
-      });
       if (text) return text;
       console.warn('[Ludo] custom API returned empty response, full data:', JSON.stringify(data));
     } catch(e) {
-      aiDebugPush({
-        source: 'lgCallAPI',
-        provider: providerBase,
-        status: 'error',
-        maxTokens,
-        sysMsg,
-        prompt: promptText,
-        rawResponse: '',
-        error: e?.stack || e?.message || String(e)
-      });
       console.warn('[Ludo] custom API error:', e.message);
     }
     return null; // 自定义 API 失败,不走 ST,直接返回 null(触发 fallback 文本)
@@ -15243,42 +15231,12 @@ async function lgCallAPI(prompt, maxTokens = 150, sysMsg = '') {
       console.log('[LudoAPI] ST generateRaw → messages:', JSON.stringify(msgs).slice(0, 300));
       const resp = await generateRaw({ prompt: msgs, responseLength: maxTokens });
       console.log('[LudoAPI] ST generateRaw raw resp:', JSON.stringify(resp));
-      aiDebugPush({
-        source: 'lgCallAPI',
-        provider: providerBase,
-        status: resp && resp.trim() ? 'ok' : 'empty',
-        maxTokens,
-        sysMsg,
-        prompt: promptText,
-        rawResponse: aiDebugPreview(resp, 50000),
-        finalText: resp && resp.trim() ? resp.trim() : ''
-      });
       if (resp && resp.trim()) return resp.trim();
       console.warn('[LudoAPI] ST generateRaw returned empty');
     } else {
-      aiDebugPush({
-        source: 'lgCallAPI',
-        provider: providerBase,
-        status: 'unavailable',
-        maxTokens,
-        sysMsg,
-        prompt: promptText,
-        rawResponse: '',
-        error: 'generateRaw not available'
-      });
       console.warn('[LudoAPI] generateRaw not available');
     }
   } catch(e) {
-    aiDebugPush({
-      source: 'lgCallAPI',
-      provider: providerBase,
-      status: 'error',
-      maxTokens,
-      sysMsg,
-      prompt: promptText,
-      rawResponse: '',
-      error: e?.stack || e?.message || String(e)
-    });
     console.warn('[LudoAPI] ST generateRaw error:', e.message, e.stack?.slice(0,200));
   }
   return null;
