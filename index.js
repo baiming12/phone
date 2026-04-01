@@ -12142,49 +12142,66 @@ async function buildXHSFeedWithAI(appendMode) {
   }
 
   // 随机选3个话题方向,保证每次刷新内容不重复
-  const topicPool = [
-    `围绕${charNamesText}之间关系的八卦讨论`,
-    `关于${charNamesText}其中一人的生活或性格传闻`,
-    `${charNamesText}在社交圈里的评价与见闻`,
-    `围绕${charNamesText}某次公开互动的讨论`,
-    `有人目击${charNamesText}其中两人一起出现后的猜测`,
-    `关于${charNamesText}过去经历被翻出来讨论`,
-    `旁观者对${charNamesText}关系变化的观察`,
-    `围绕${charNamesText}之一的外形、气质、作风的闲聊`,
-    `关于${charNamesText}中某人的传闻和不同看法`,
-    `讨论${charNamesText}之间微妙气氛的一条帖子`,
-  ];
+    const topicPool = [
+      `【贴图】盖楼收集${charNamesText}近期的紧身衣和黑丝局部特写照`,
+      `【吃瓜】技术贴分析：${charNamesText}这组路透图是不是没穿内衣？`,
+      `【求物】悬赏1000币，求${charNamesText}之前那个被秒删的擦边视频补档`,
+      `【YY】就${charNamesText}现在这个身材发育，实战起来什么水平？`,
+      `【讨论】有人目击${charNamesText}昨晚进酒店，这是被金主拿下了吗`,
+      `【流出】疑似${charNamesText}早期的私拍套图，懂的兄弟进`,
+      `【资源】深夜发车，本月最新步兵高清合集（磁力链接/手慢无）`,
+      `【求出处】万能的老哥们，求动图里这个妹子的番号或主页指路`,
+      `【交流】新人测评：最近刚入手的几款名器倒模真实使用体验`,
+      `【福利】清硬盘了，散一些私藏的国产探花和极品素人图包`,
+      `【吐槽】某鱼舞蹈区现在的底线越来越低了，大半夜全在打擦边球（附录像）`
+      // 各种XP和资源分类的话题
+      `【绿帽/NTR】整理了一波高质量苦主视角合集，牛头人狂喜`,
+      `【多人/乱交】周末某私人别墅淫趴流出，高能混战实录`,
+      `【第一视角】沉浸感拉满！极品前女友男友视角私拍流出`,
+      `【探花/盗摄】最新连锁酒店隐蔽视角，刺激无下限`,
+      `【剧情向】有铺垫才带感，精选日系大厂经典角色扮演合集`,
+      `【制服控】空姐/护士/教师三套连发，黑丝网袜一次看爽`,
+      `【重口/凌辱】地下室粗暴对待实录（心理承受弱者慎入）`,
+      `【BDSM】高端圈子主奴字母圈真实记录，各种道具齐全`,
+      `【步入正题】不要剧情直接开干，简单粗暴无前戏合集`,
+      `【夜场/捡尸】夜店门口真实捡尸，神志不清随便摆弄实录`,
+      `【野外/露出】深夜公园长椅极限挑战，随时可能被路人发现`,
+      `【公厕/便器】商场女厕隔间里的秘密，隔壁有人极度刺激`,
+      `【猎奇/黑道】地下钱庄肉偿还债实录，绝望的强迫接客惩罚`,
+      `【背德/家庭】禁忌的快感，近亲家庭伦理系列精选包`,
+      `【常识替换】深度催眠洗脑系列，一步步完全沦陷的实录`
+    ];
   const pick3 = (arr) => { const a=[...arr].sort(()=>Math.random()-0.5); return a.slice(0,3); };
   const chosenTopics = pick3(topicPool);
 
   try {
-    const sysMsg = `你是一个论坛帖子生成器。严格按要求生成3条帖子，每条帖子独立，内容和评论不能重复。
+    const sysMsg = `你是一个深网暗黑风格、擦边色佬论坛的帖子生成器。严格按要求生成3条帖子，每条帖子独立，内容和评论不能重复。
 
-本次帖子可能涉及的角色有：${charNamesText}
-你可以：
-- 任选其中1个角色作为帖子核心
-- 或选择其中2到3个角色之间的互动/关系作为帖子核心
-- 不要求每条帖子都提到全部角色
+    本次帖子可能涉及的讨论对象有：${charNamesText}
+    你可以：
+    - 任选其中1个角色作为被偷拍、意淫、爆料或求资源的核心对象
+    - 或选择其中2到3个角色之间的私密关系/尺度互动作为帖子核心
+    - 不要求每条帖子都提到全部角色
 
-帖子要求：
-- 话题严格对应下方给出的3个不同方向
-- 采用普通网友发帖视角，像围观者、旁观者、路人、熟人、知情人发帖
-- 标题简洁明确，像论坛标题
-- 正文40到90字，口语化，自然
-- 不要写成小红书、短视频、营销号文案
-- 可以八卦、猜测、观察、吐槽，但不要太浮夸
+    帖子要求：
+    - 话题严格对应下方给出的3个不同方向，充满LSP论坛的真实感
+    - 采用论坛老哥视角发帖，像：私拍摄影师、求资源的伸手党、吃瓜群众、偷窥者、鉴黄师
+    - 标题带有强烈的噱头，像黑市或资源论坛的标题（可带【流出】【求物】【技术分析】等前缀）
+    - 正文40到90字，用词粗俗、口语化，带有黑话（如：步兵、骑兵、下海、探花、实战等）
+    - 绝对不要写成小红书、营销号的岁月静好文案
+    - 重点描写身材评价、私密猜测、露骨的YY、或者对擦边资源的渴求
 
-评论要求（每条帖子各自生成5条）：
-- 评论像论坛回帖
-- 可以包含：共鸣、追问、补充经历、吐槽、质疑、分析、站队
-- 每条评论都要像不同的人说话
-- 评论内容和昵称都不能重复
+    评论要求（每条帖子各自生成5条）：
+    - 评论像真实的色佬论坛回帖
+    - 可以包含：求留邮箱、好人一生平安、催更完整版、评价尺度、质疑真假、交流实战经验
+    - 每条评论都要像不同的论坛老哥说话，昵称要有网感（如：爱吃肉的狼、一夜七次郎等）
+    - 评论内容和昵称都不能重复
 
-只返回JSON数组，格式如下：
-[{"user":"昵称","tag":"标签","title":"标题","body":"正文","likes":数字,"comments":[{"user":"昵称","text":"评论内容"}]}]
+    只返回JSON数组，格式如下：
+    [{"user":"昵称","tag":"标签","title":"标题","body":"正文","likes":数字,"comments":[{"user":"昵称","text":"评论内容"}]}]
 
-共3条，不要有任何解释文字。
-重要：字段值内部不要出现英文双引号。`;
+    共3条，不要有任何解释文字。
+    重要：字段值内部不要出现英文双引号。`;
 
     const charInfo = charPersona ? charPersona.slice(0, 150) : `角色名单:${charNamesText}`;
     const prompt = `角色信息:${charInfo}\n用户名:${userName}\n近期对话片段:${(recentChat||'').slice(0,100)}\n\n本次3条帖子话题方向:\n${chosenTopics.map((t,i)=>`${i+1}. ${t}`).join('\n')}\n\n生成JSON:`;
@@ -12395,6 +12412,7 @@ async function generateXHSStrangerComments(postId) {
   const ctx = getContext() || {};
   const charNames = getForumCharNamesForContext(ctx);
   const charNamesText = charNames.join('、') || 'TA';
+  const fallbackCharName = charNames[0] || 'TA';
   const userName = ctx?.name1 || '楼主';
 
   // 从角色卡提取关系背景
@@ -12412,7 +12430,7 @@ async function generateXHSStrangerComments(postId) {
 
   // 从聊天记录提取最近 15 条(足够推断称谓关系,token 消耗小)
   const recentChat = (ctx?.chat || []).slice(-15).map(m => {
-    const spk = m.is_user ? userName : (m.name || charName);
+    const spk = m.is_user ? userName : (m.name || fallbackCharName);
     return spk + ': ' + (m.mes || '').replace(/<[^>]+>/g,'').trim().slice(0,120);
   }).join('\n');
 
@@ -12422,29 +12440,31 @@ async function generateXHSStrangerComments(postId) {
     recentChat         ? `【近期对话片段】\n${recentChat}`  : '',
   ].filter(Boolean).join('\n');
 
-  const sysMsg = `你是一个小红书评论模拟器。以下帖子是由用户${userName}本人发的,模拟5位性格各异的陌生网友评论。
+    const sysMsg = `你是一个深网擦边色佬论坛的评论模拟器。以下帖子是由论坛用户${userName}(楼主)发的，请模拟5位性格各异的论坛老哥/LSP水友的真实回帖。
 
-人物关系说明(严格遵守,不能混淆):
-- 帖子里的"我"表示发帖人${userName}自己
-- ${charName}(姓${charLast})是帖子中涉及到的另一个人物,不是发帖人
-- 请根据下方【角色背景】和【近期对话片段】判断帖子中出现的亲属/关系称谓(如"我爸""我父亲""我男友"等)究竟对应谁;如果背景已明确说明${charName}与${userName}的关系,则以该关系为准,不得臆造第三人
-- 评论者是不认识${userName}的陌生网友,他们通过帖子内容来理解人物关系
+    人物关系与核心限制(严格遵守，不能混淆):
+    - 帖子里的"我"表示发帖人${userName}(楼主)自己，他可能是资源的发布者、分享者或特殊经历的当事人。
+    - 帖子可能涉及这些女性/目标角色中的一个或多个：${charNamesText}
+    - 绝对禁止在评论中直接说出${charNamesText}中任何人的名字。老哥们只能用"这女的"、"妹子"、"极品"、"骚货"、"原配"、"小三"等论坛常用代称。
+    - 请根据下方【角色背景】和【近期对话片段】判断帖子中出现的亲属/关系称谓(如"我老婆""我女友""我妹"等)究竟对应${charNamesText}中的哪一位；如果背景已明确说明相关关系，则以背景为准，不得臆造第三人。
+    - 评论者是不认识${userName}的论坛水友，他们通过帖子内容来判断这是一手资源、吃瓜爆料还是XP分享。
 
-${relationCtx ? relationCtx + '\n' : ''}
-评论要求:
-- 每条评论必须紧扣帖子实际内容,不能搞错人物关系
-- 评论有实质内容,不只是"坐等后续"空话
-- 猜测八卦型可以点出${charName}/${charLast}的名字
+    ${relationCtx ? relationCtx + '\n' : ''}
+    评论要求:
+    - 每条评论必须紧扣帖子实际内容，不能搞错人物关系。
+    - 语气粗鄙、真实、带有强烈的底层网感和黑话(如:滑了、步兵、借一部说话、顶贴、好人一生平安等)。
+    - 可以自然地讨论/意淫${charNamesText}中与帖子最相关的那个人(使用代称)，但不要每条都强行把所有人写进去。
+    - 不要任何岁月静好或正常的交流，完全展现LSP的真实面貌。
 
-性格类型(各一条):
-1. 吃瓜补料型:结合帖子内容补充信息或目击经历
-2. 担心共情型:针对帖子情境表达具体担忧
-3. 阴阳怪气型:用正常语气阴阳,有具体所指
-4. 无脑力挺型:支持${userName}立场,情绪化但有观点
-5. 猜测爆瓜型:点出${charName}名字,八卦语气
+    性格类型(各生成一条):
+    1. 纯种伸手党: 焦急地索要完整版、无码图、磁力链接或网盘密码，留下套话或直接甩邮箱求发。
+    2. 列文虎克鉴黄师: 像老手一样分析画面细节，如放大看走光、分析是否AI换脸、怀疑摆拍或探讨身材比例。
+    3. 发情实战派: 针对帖子里的情境或身体部位，发表极其露骨的生理反应描述，意淫如果自己上阵会怎样。
+    4. 暴躁催更老哥: 脾气极差，骂楼主挤牙膏、断章狗，嫌弃画质太糊或没露关键部位，满口粗话催促后续。
+    5. 经验老道点评家: 拿这个资源和别的对比，或用专业老司机的口吻点评图中妹子的"实战价值"、"开发潜力"。
 
-每条15-30字,口语化,带emoji昵称。
-只返回JSON:[{"user":"昵称","text":"评论内容"}]`;
+    每条15-30字，高度口语化，千万不要用emoji。
+    只返回JSON:[{"user":"老哥昵称","text":"评论内容"}]`;
 
   const prompt = `帖子标题:${post.title}\n帖子内容:${post.body}`;
   const resp = await lgCallAPI(prompt, 400, sysMsg);
@@ -12500,8 +12520,9 @@ async function generateXHSReplyToComment(postId, userComment, userName) {
   const post = (STATE.xhsFeed || []).find(p => p.id === postId);
   if (!post) return;
   const ctx = getContext() || {};
-  const charName = ctx?.name2 || ctx?.name || 'TA';
-  const charLast = charName.split(/\s+/).pop() || charName;
+  const charNames = getForumCharNamesForContext(ctx);
+  const charNamesText = charNames.join('、') || 'TA';
+  const fallbackCharName = charNames[0] || 'TA';
   const recentComments = (post.comments||[]).slice(-5).map(c=>`${c.user}:${c.text}`).join('\n');
 
   // 读取角色卡关系背景(与 generateXHSStrangerComments 相同逻辑)
@@ -12519,7 +12540,7 @@ async function generateXHSReplyToComment(postId, userComment, userName) {
 
   // 近期聊天记录(最近 10 条,用于推断称谓关系)
   const recentChatSnippet = (ctx?.chat || []).slice(-10).map(m => {
-    const spk = m.is_user ? userName : (m.name || charName);
+    const spk = m.is_user ? userName : (m.name || fallbackCharName);
     return spk + ': ' + (m.mes || '').replace(/<[^>]+>/g,'').trim().slice(0,100);
   }).join('\n');
 
@@ -12528,14 +12549,29 @@ async function generateXHSReplyToComment(postId, userComment, userName) {
     recentChatSnippet  ? `【近期对话】\n${recentChatSnippet}` : '',
   ].filter(Boolean).join('\n');
 
-  const sysMsg = `你是小红书评论区生成器。根据帖子内容和用户评论,生成3个自然贴切的陌生网友回复。
-要求:
-- 3条回复必须紧扣帖子主题和用户说的话,不能答非所问
-- 3条风格各异(如追问细节、调侃起哄、加料补充、共情、质疑等),根据帖子和评论内容自然选择
-- 每条15-25字,口语化小红书风格,昵称带emoji有创意
-帖子背景:涉及用户与 ${charName}(姓${charLast})的相关话题。请根据下方背景资料判断帖子中出现的亲属/关系称谓实际对应谁,以背景为准,不得臆造第三人。
-${relationCtx ? '\n' + relationCtx + '\n' : ''}
-只返回JSON数组:[{"user":"昵称emoji","text":"回复内容"},{"user":"昵称emoji","text":"回复内容"},{"user":"昵称emoji","text":"回复内容"}]`;
+    const sysMsg = `你是一个深网擦边色佬论坛的楼中楼回复生成器。根据帖子内容和层主的评论,生成3个自然贴切的论坛老哥/LSP水友的二级回复。
+
+    核心要求(严格遵守):
+    - 3条回复必须紧扣帖子主题和层主说的话,展现LSP论坛真实的互动氛围(如:互怼、求分享、探讨XP、鉴定真伪等)。
+    - 语气必须粗鄙、直接、带有底层网感和黑话(如:老哥借一步说话、留邮箱、滑了、实战利器等)。
+    - 绝对不要出现任何岁月静好、正常社交的用词。
+    - 每条15-25字,高度口语化,千万不要用emoji。
+
+    人物关系与限制:
+    - 帖子可能涉及这些女性/目标角色中的一个或多个：${charNamesText}。
+    - 绝对禁止在回复中直接说出${charNamesText}中任何人的名字。只能用"这女的"、"妹子"、"骚货"、"极品"等代称。
+    - 请根据下方背景资料判断帖子中出现的亲属/关系称谓实际对应谁,以背景为准,不得臆造第三人。
+    - 可以自然提到最相关的人(使用代称)，不要每条都强行提到全部角色。
+
+    ${relationCtx ? '\n' + relationCtx + '\n' : ''}
+
+    回复风格参考(随机组合3种不同的):
+    - 伸手跟风: "同求老哥，邮箱xxxx"、"插眼，等个完整版"
+    - 暴躁互怼: 骂楼主断章狗、或者反驳层主的观点("楼上是不是瞎，这明显是AI换脸")
+    - XP共鸣: "确实，这种反差感最带劲"、"这身材实战绝对爽"
+    - 列文虎克: 补充画面细节分析，探讨真假或尺度。
+
+    只返回JSON数组:[{"user":"老哥昵称","text":"回复内容"},{"user":"老哥昵称","text":"回复内容"},{"user":"老哥昵称","text":"回复内容"}]`;
 
   const prompt = `帖子标题:${post.title}\n近期评论:\n${recentComments}\n用户${userName}刚说:「${userComment}」\n生成3条回复JSON:`;
 
@@ -12567,7 +12603,7 @@ ${relationCtx ? '\n' + relationCtx + '\n' : ''}
       if (!p2) return;
       const now = new Date();
       const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-      const nick = r.user || '路人甲🍿';
+      const nick = r.user || '路人甲';
       const replyText = (r.text || '').trim();
       if (!replyText) return;
       const refIdx = (userCidx !== null && userCidx < p2.comments.length) ? userCidx : null;
