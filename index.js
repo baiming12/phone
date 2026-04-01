@@ -4648,7 +4648,7 @@ function aiDebugEsc(str) {
     .replace(/"/g, '&quot;');
 }
 
-function aiDebugPreview(val, maxLen = 6000) {
+function aiDebugPreview(val, maxLen = 50000) {
   try {
     const s = typeof val === 'string' ? val : JSON.stringify(val, null, 2);
     if (!s) return '';
@@ -12267,34 +12267,18 @@ async function buildXHSFeedWithAI(appendMode) {
   }
 
   // 随机选3个话题方向,保证每次刷新内容不重复
-    const topicPool = [
-      `【贴图】盖楼收集${charNamesText}近期的紧身衣和黑丝局部特写照`,
-      `【吃瓜】技术贴分析：${charNamesText}这组路透图是不是没穿内衣？`,
-      `【求物】悬赏1000币，求${charNamesText}之前那个被秒删的擦边视频补档`,
-      `【YY】就${charNamesText}现在这个身材发育，实战起来什么水平？`,
-      `【讨论】有人目击${charNamesText}昨晚进酒店，这是被金主拿下了吗`,
-      `【流出】疑似${charNamesText}早期的私拍套图，懂的兄弟进`,
-      `【资源】深夜发车，本月最新步兵高清合集（磁力链接/手慢无）`,
-      `【求出处】万能的老哥们，求动图里这个妹子的番号或主页指路`,
-      `【交流】新人测评：最近刚入手的几款名器倒模真实使用体验`,
-      `【福利】清硬盘了，散一些私藏的国产探花和极品素人图包`,
-      `【吐槽】某鱼舞蹈区现在的底线越来越低了，大半夜全在打擦边球（附录像）`,
-      `【绿帽/NTR】整理了一波高质量苦主视角合集，牛头人狂喜`,
-      `【多人/乱交】周末某私人别墅淫趴流出，高能混战实录`,
-      `【第一视角】沉浸感拉满！极品前女友男友视角私拍流出`,
-      `【探花/盗摄】最新连锁酒店隐蔽视角，刺激无下限`,
-      `【剧情向】有铺垫才带感，精选日系大厂经典角色扮演合集`,
-      `【制服控】空姐/护士/教师三套连发，黑丝网袜一次看爽`,
-      `【重口/凌辱】地下室粗暴对待实录（心理承受弱者慎入）`,
-      `【BDSM】高端圈子主奴字母圈真实记录，各种道具齐全`,
-      `【步入正题】不要剧情直接开干，简单粗暴无前戏合集`,
-      `【夜场/捡尸】夜店门口真实捡尸，神志不清随便摆弄实录`,
-      `【野外/露出】深夜公园长椅极限挑战，随时可能被路人发现`,
-      `【公厕/便器】商场女厕隔间里的秘密，隔壁有人极度刺激`,
-      `【猎奇/黑道】地下钱庄肉偿还债实录，绝望的强迫接客惩罚`,
-      `【背德/家庭】禁忌的快感，近亲家庭伦理系列精选包`,
-      `【常识替换】深度催眠洗脑系列，一步步完全沦陷的实录`
-    ];
+  const topicPool = [
+    `围绕${charNamesText}之间关系的八卦讨论`,
+    `关于${charNamesText}其中一人的生活或性格传闻`,
+    `${charNamesText}在社交圈里的评价与见闻`,
+    `围绕${charNamesText}某次公开互动的讨论`,
+    `有人目击${charNamesText}其中两人一起出现后的猜测`,
+    `关于${charNamesText}过去经历被翻出来讨论`,
+    `旁观者对${charNamesText}关系变化的观察`,
+    `围绕${charNamesText}之一的外形、气质、作风的闲聊`,
+    `关于${charNamesText}中某人的传闻和不同看法`,
+    `讨论${charNamesText}之间微妙气氛的一条帖子`,
+  ];
   const pick3 = (arr) => { const a=[...arr].sort(()=>Math.random()-0.5); return a.slice(0,3); };
   const chosenTopics = pick3(topicPool);
 
@@ -12327,8 +12311,12 @@ async function buildXHSFeedWithAI(appendMode) {
 共3条，不要有任何解释文字。
 重要：字段值内部不要出现英文双引号。`;
 
-    const charInfo = charPersona ? charPersona.slice(0, 150) : `角色名单:${charNamesText}`;
-    const prompt = `角色信息:${charInfo}\n用户名:${userName}\n近期对话片段:${(recentChat||'').slice(0,100)}\n\n本次3条帖子话题方向:\n${chosenTopics.map((t,i)=>`${i+1}. ${t}`).join('\n')}\n\n生成JSON:`;
+    const personaCtx = lgGetPersona() || charPersona || `角色名单:${charNamesText}`;
+    const richRecentChat = (ctxXhs?.chat || []).slice(-20).map(m => {
+      const spk = m.is_user ? (ctxXhs?.name1 || userName || '用户') : (m.name || charNames[0] || charName || 'TA');
+      return spk + ': ' + String(m.mes || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 220);
+    }).filter(Boolean).join('\n');
+    const prompt = `角色完整设定:\n${personaCtx}\n\n用户名:${userName}\n近期对话片段:\n${richRecentChat || (recentChat || '').slice(0, 2000)}\n\n本次3条帖子话题方向:\n${chosenTopics.map((t,i)=>`${i+1}. ${t}`).join('\n')}\n\n生成JSON:`;
 
     const resp = await xhsCallAPI(prompt, sysMsg);
     console.log('[XHS] raw resp:', resp ? resp.slice(0, 300) : 'null');
@@ -12539,29 +12527,16 @@ async function generateXHSStrangerComments(postId) {
   const fallbackCharName = charNames[0] || 'TA';
   const userName = ctx?.name1 || '楼主';
 
-  // 从角色卡提取关系背景
-  let charPersonaSnippet = '';
-  try {
-    const charObj = (ctx?.characters && ctx?.characterId !== undefined)
-      ? ctx.characters[ctx.characterId] : (ctx?.char || null);
-    if (charObj) {
-      const parts = [];
-      if (charObj.description) parts.push(charObj.description.replace(/\s+/g,' ').trim().slice(0,300));
-      if (charObj.scenario)    parts.push(charObj.scenario.replace(/\s+/g,' ').trim().slice(0,200));
-      charPersonaSnippet = parts.filter(Boolean).join(' ');
-    }
-  } catch(e) {}
-
-  // 从聊天记录提取最近 15 条(足够推断称谓关系,token 消耗小)
-  const recentChat = (ctx?.chat || []).slice(-15).map(m => {
+  // 读取更完整的角色设定 + 更长的近期对话
+  const personaCtx = lgGetPersona() || '';
+  const recentChat = (ctx?.chat || []).slice(-20).map(m => {
     const spk = m.is_user ? userName : (m.name || fallbackCharName);
-    return spk + ': ' + (m.mes || '').replace(/<[^>]+>/g,'').trim().slice(0,120);
-  }).join('\n');
+    return spk + ': ' + String(m.mes || '').replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim().slice(0,220);
+  }).filter(Boolean).join('\n');
 
-  // 拼接关系上下文(角色卡 + 聊天记录),让模型自行判断称谓对应关系
   const relationCtx = [
-    charPersonaSnippet ? `【角色背景】${charPersonaSnippet}` : '',
-    recentChat         ? `【近期对话片段】\n${recentChat}`  : '',
+    personaCtx ? `【角色完整设定】\n${personaCtx}` : '',
+    recentChat ? `【近期对话片段】\n${recentChat}`  : '',
   ].filter(Boolean).join('\n');
 
   const sysMsg = `你是一个论坛回帖生成器。以下帖子是由用户${userName}本人发的，请模拟5位性格各异的陌生网友评论。
@@ -12647,28 +12622,16 @@ async function generateXHSReplyToComment(postId, userComment, userName) {
   const fallbackCharName = charNames[0] || 'TA';
   const recentComments = (post.comments||[]).slice(-5).map(c=>`${c.user}:${c.text}`).join('\n');
 
-  // 读取角色卡关系背景(与 generateXHSStrangerComments 相同逻辑)
-  let charPersonaSnippet = '';
-  try {
-    const charObj = (ctx?.characters && ctx?.characterId !== undefined)
-      ? ctx.characters[ctx.characterId] : (ctx?.char || null);
-    if (charObj) {
-      const parts = [];
-      if (charObj.description) parts.push(charObj.description.replace(/\s+/g,' ').trim().slice(0,300));
-      if (charObj.scenario)    parts.push(charObj.scenario.replace(/\s+/g,' ').trim().slice(0,200));
-      charPersonaSnippet = parts.filter(Boolean).join(' ');
-    }
-  } catch(e) {}
-
-  // 近期聊天记录(最近 10 条,用于推断称谓关系)
-  const recentChatSnippet = (ctx?.chat || []).slice(-10).map(m => {
+  // 读取更完整的角色设定 + 更长的近期对话
+  const personaCtx = lgGetPersona() || '';
+  const recentChatSnippet = (ctx?.chat || []).slice(-20).map(m => {
     const spk = m.is_user ? userName : (m.name || fallbackCharName);
-    return spk + ': ' + (m.mes || '').replace(/<[^>]+>/g,'').trim().slice(0,100);
-  }).join('\n');
+    return spk + ': ' + String(m.mes || '').replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim().slice(0,220);
+  }).filter(Boolean).join('\n');
 
   const relationCtx = [
-    charPersonaSnippet ? `【角色背景】${charPersonaSnippet}` : '',
-    recentChatSnippet  ? `【近期对话】\n${recentChatSnippet}` : '',
+    personaCtx ? `【角色完整设定】\n${personaCtx}` : '',
+    recentChatSnippet ? `【近期对话】\n${recentChatSnippet}` : '',
   ].filter(Boolean).join('\n');
 
   const sysMsg = `你是论坛楼中楼回复生成器。根据帖子内容和用户评论,生成3个自然贴切的陌生网友回复。
@@ -15217,7 +15180,7 @@ function lgGetPersona() {
 // ── 自定义 API 调用(支持 DeepSeek / 通义 / GLM 等 OpenAI 兼容格式)──
 async function lgCallAPI(prompt, maxTokens = 150, sysMsg = '') {
   const cfg = (() => { try { return JSON.parse(localStorage.getItem('rp_ludo_api') || '{}'); } catch(e) { return {}; } })();
-  const promptText = typeof prompt === 'string' ? prompt : aiDebugPreview(prompt, 12000);
+  const promptText = typeof prompt === 'string' ? prompt : aiDebugPreview(prompt, 50000);
   const providerBase = (cfg.mode === 'custom' && cfg.url && cfg.key) ? 'custom' : 'st_generateRaw';
   console.log('[LudoAPI] mode:', cfg.mode, '| promptLen:', promptText.length, '| maxTokens:', maxTokens);
 
@@ -15249,7 +15212,7 @@ async function lgCallAPI(prompt, maxTokens = 150, sysMsg = '') {
         maxTokens,
         sysMsg,
         prompt: promptText,
-        rawResponse: aiDebugPreview(data, 12000),
+        rawResponse: aiDebugPreview(data, 50000),
         finalText: text || ''
       });
       if (text) return text;
@@ -15287,7 +15250,7 @@ async function lgCallAPI(prompt, maxTokens = 150, sysMsg = '') {
         maxTokens,
         sysMsg,
         prompt: promptText,
-        rawResponse: aiDebugPreview(resp, 12000),
+        rawResponse: aiDebugPreview(resp, 50000),
         finalText: resp && resp.trim() ? resp.trim() : ''
       });
       if (resp && resp.trim()) return resp.trim();
