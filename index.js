@@ -5104,7 +5104,7 @@ function buildPhoneExtractionPrompt() {
     }).filter(Boolean);
     if (diaryLines.length) parts.push('【日记】\n' + diaryLines.join('\n'));
 
-    // 最近小红书
+    // 最近小红书（含评论 / 回复）
     const xhsLines = (STATE.xhsFeed || []).slice(0, 3).map(p => {
       const who = p.user || (p.from === 'user' ? '我' : '路人');
       const title = _rpClipText(_rpPlainText(p.title || ''), 24);
@@ -5112,7 +5112,18 @@ function buildPhoneExtractionPrompt() {
       const merged = [title, body].filter(Boolean).join('｜');
       if (!merged) return '';
       const t = [p.date, p.time].filter(Boolean).join(' ');
-      return '- ' + (t ? t + ' ' : '') + who + '：' + merged;
+      const comments = (p.comments || []).slice(-4).map((c, idx, arr) => {
+        const cUser = c.user || c.name || c.from || '某人';
+        const cText = _rpClipText(_rpPlainText(c.text || c.body || ''), 36);
+        if (!cText) return '';
+        const replyToName = (c.replyTo !== null && c.replyTo !== undefined && arr[c.replyTo])
+          ? (arr[c.replyTo].user || arr[c.replyTo].name || arr[c.replyTo].from || '某人')
+          : '';
+        return replyToName
+          ? `↳ ${cUser} 回复 @${replyToName}：${cText}`
+          : `↳ ${cUser}：${cText}`;
+      }).filter(Boolean);
+      return '- ' + (t ? t + ' ' : '') + who + '：' + merged + (comments.length ? '；评论：' + comments.join(' / ') : '');
     }).filter(Boolean);
     if (xhsLines.length) parts.push('【小红书】\n' + xhsLines.join('\n'));
 
@@ -5232,7 +5243,18 @@ function buildPhoneClipboardSummary() {
       const merged = [title, body].filter(Boolean).join('｜');
       if (!merged) return '';
       const t = [p.date, p.time].filter(Boolean).join(' ');
-      return '- ' + (t ? t + ' ' : '') + who + '：' + merged;
+      const comments = (p.comments || []).slice(-8).map((c, idx, arr) => {
+        const cUser = c.user || c.name || c.from || '某人';
+        const cText = _rpClipText(_rpPlainText(c.text || c.body || ''), 120);
+        if (!cText) return '';
+        const replyToName = (c.replyTo !== null && c.replyTo !== undefined && arr[c.replyTo])
+          ? (arr[c.replyTo].user || arr[c.replyTo].name || arr[c.replyTo].from || '某人')
+          : '';
+        return replyToName
+          ? `↳ ${cUser} 回复 @${replyToName}：${cText}`
+          : `↳ ${cUser}：${cText}`;
+      }).filter(Boolean);
+      return '- ' + (t ? t + ' ' : '') + who + '：' + merged + (comments.length ? '\n  ' + comments.join('\n  ') : '');
     }).filter(Boolean);
     if (xhsLines.length) parts.push('【小红书】\n' + xhsLines.join('\n'));
 
