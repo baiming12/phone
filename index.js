@@ -5164,6 +5164,139 @@ function applyPhoneExtractionPrompt(reason) {
   }
 }
 
+
+function _rpNowHM() {
+  try {
+    const d = new Date();
+    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  } catch (e) {
+    return '';
+  }
+}
+
+function buildPhoneClipboardSummary() {
+  try {
+    const parts = [];
+
+    if (STATE.sync && (STATE.sync.stage || STATE.sync.progress || STATE.sync.status)) {
+      parts.push(`【关系进度】
+- 第${STATE.sync.stage || 1}阶段 / ${STATE.sync.progress || 0}% / ${STATE.sync.status || '进行中'}`);
+    }
+
+    const allThreads = Object.values(STATE.threads || {}).filter(th => th && Array.isArray(th.messages) && th.messages.length);
+    const privateThreads = allThreads
+      .filter(th => th.type !== 'group' && !String(th.id || '').startsWith('grp_') && th.id !== 'user')
+      .sort((a, b) => (b.messages?.length || 0) - (a.messages?.length || 0))
+      .slice(0, 8);
+    const groupThreads = allThreads
+      .filter(th => th.type === 'group' || String(th.id || '').startsWith('grp_'))
+      .sort((a, b) => (b.messages?.length || 0) - (a.messages?.length || 0))
+      .slice(0, 4);
+
+    const threadParts = [];
+    privateThreads.forEach(th => {
+      const head = `私聊·${th.name || '未命名联系人'}`;
+      const lines = (th.messages || []).slice(-8).map(m => _rpFormatPhoneItem(m, th.name)).filter(Boolean);
+      if (lines.length) threadParts.push(head + '\n- ' + lines.join('\n- '));
+    });
+    groupThreads.forEach(th => {
+      const head = `群聊·${th.name || '未命名群聊'}`;
+      const lines = (th.messages || []).slice(-10).map(m => _rpFormatPhoneItem(m, th.name)).filter(Boolean);
+      if (lines.length) threadParts.push(head + '\n- ' + lines.join('\n- '));
+    });
+    if (threadParts.length) parts.push('【手机消息】\n' + threadParts.join('\n\n'));
+
+    const momentLines = (STATE.moments || []).slice(-8).map(m => {
+      const body = _rpClipText(_rpPlainText(m.text || m.body || ''), 180);
+      if (!body) return '';
+      const who = m.name || m.from || '某人';
+      const t = [m.date, m.time].filter(Boolean).join(' ');
+      return '- ' + (t ? t + ' ' : '') + who + '：' + body;
+    }).filter(Boolean);
+    if (momentLines.length) parts.push('【朋友圈】\n' + momentLines.join('\n'));
+
+    const diaryLines = (STATE.diary || []).slice(-6).map(d => {
+      const role = d.author === 'user' ? '我' : '日记/AI';
+      const body = _rpClipText(_rpPlainText(d.text || ''), 220);
+      if (!body) return '';
+      const reply = d.reply ? '；回复：' + _rpClipText(_rpPlainText(d.reply), 120) : '';
+      const t = [d.date, d.time].filter(Boolean).join(' ');
+      return '- ' + (t ? t + ' ' : '') + role + '：' + body + reply;
+    }).filter(Boolean);
+    if (diaryLines.length) parts.push('【日记】\n' + diaryLines.join('\n'));
+
+    const xhsLines = (STATE.xhsFeed || []).slice(0, 8).map(p => {
+      const who = p.user || (p.from === 'user' ? '我' : '路人');
+      const title = _rpClipText(_rpPlainText(p.title || ''), 60);
+      const body = _rpClipText(_rpPlainText(p.body || ''), 180);
+      const merged = [title, body].filter(Boolean).join('｜');
+      if (!merged) return '';
+      const t = [p.date, p.time].filter(Boolean).join(' ');
+      return '- ' + (t ? t + ' ' : '') + who + '：' + merged;
+    }).filter(Boolean);
+    if (xhsLines.length) parts.push('【小红书】\n' + xhsLines.join('\n'));
+
+    const summary = parts.join('\n\n').trim();
+    return summary ? _rpClipText(summary, 12000) : '';
+  } catch (e) {
+    console.warn('[PhoneExtract] buildPhoneClipboardSummary failed:', e);
+    return '';
+  }
+}
+
+async function copyPhoneSummaryToClipboard() {
+  try {
+    const text = buildPhoneClipboardSummary();
+    if (!text) {
+      try { showBanner('提取模块', '没有可复制的手机内容', _rpNowHM()); } catch (e) {}
+      return false;
+    }
+
+    let copied = false;
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      try {
+        await navigator.clipboard.writeText(text);
+        copied = true;
+      } catch (e) {}
+    }
+
+    if (!copied) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', 'readonly');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      ta.style.pointerEvents = 'none';
+      ta.style.left = '-9999px';
+      ta.style.top = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      ta.setSelectionRange(0, ta.value.length);
+      try {
+        copied = !!document.execCommand('copy');
+      } catch (e) {
+        copied = false;
+      }
+      ta.remove();
+    }
+
+    if (copied) {
+      try { showBanner('提取模块', '手机摘要已复制到剪贴板', _rpNowHM()); } catch (e) {}
+      return true;
+    }
+
+    try { showBanner('提取模块', '复制失败，请检查浏览器剪贴板权限', _rpNowHM()); } catch (e) {}
+    return false;
+  } catch (e) {
+    console.warn('[PhoneExtract] copyPhoneSummaryToClipboard failed:', e);
+    try { showBanner('提取模块', '复制失败：' + (e?.message || e), _rpNowHM()); } catch (e2) {}
+    return false;
+  }
+}
+
+window.rpCopyPhoneSummary = copyPhoneSummaryToClipboard;
+
 function installPhoneExtractionHook() {
   if (window.__rpPhoneExtractHookInstalled) return;
   window.__rpPhoneExtractHookInstalled = true;
@@ -5692,6 +5825,16 @@ const HTML = `
               </div>
               <div class="rp-set-row" style="justify-content:flex-end">
                 <button id="rp-forum-prompts-reset" class="rp-set-upload-btn">恢复默认论坛模板</button>
+              </div>
+            </div>
+            <div class="rp-set-section-title">手机提取</div>
+            <div class="rp-set-section">
+              <div class="rp-set-row" style="flex-direction:column;align-items:stretch;gap:8px">
+                <div class="rp-set-key" style="width:100%">复制手机摘要到剪贴板</div>
+                <div class="rp-set-hint" style="width:100%;line-height:1.5">直接抓取当前聊天绑定的小手机内容，包括私聊、群聊、朋友圈、日记、小红书和关系进度。复制后你可以手动粘贴到正文、世界书或任意提示词位置。</div>
+                <div style="display:flex;gap:8px">
+                  <button id="rp-copy-phone-summary" class="rp-set-upload-btn" style="flex:1">📋 复制手机摘要</button>
+                </div>
               </div>
             </div>
 
@@ -6960,6 +7103,11 @@ function bindUI() {
     STATE.forumReplyPromptText = DEFAULT_FORUM_REPLY_PROMPT_TEXT;
     fillForumSettingsInputs();
     saveState();
+  });
+
+
+  $(document).on('click', '#rp-copy-phone-summary', function() {
+    copyPhoneSummaryToClipboard();
   });
 
   // 银行卡 - 刷新按钮
