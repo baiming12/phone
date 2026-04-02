@@ -5168,20 +5168,78 @@ function installPhoneExtractionHook() {
   if (window.__rpPhoneExtractHookInstalled) return;
   window.__rpPhoneExtractHookInstalled = true;
 
-  // 普通正文发送：点发送按钮
+  const bindEventHook = (eventKey, reason) => {
+    try {
+      if (!(eventSource && event_types)) return false;
+      const ev = event_types[eventKey];
+      if (!ev) return false;
+      eventSource.on(ev, () => applyPhoneExtractionPrompt(reason || eventKey));
+      console.log('[PhoneExtract] bound ST event hook:', eventKey, '=>', ev);
+      return true;
+    } catch (e) {
+      console.warn('[PhoneExtract] bindEventHook failed:', eventKey, e);
+      return false;
+    }
+  };
+
+  // 核心：只要 ST 开始准备本次生成，就统一注入手机摘要
+  // GENERATE_BEFORE_COMBINE_PROMPTS 最稳：还没真正合并提示词
+  bindEventHook('GENERATE_BEFORE_COMBINE_PROMPTS', 'before_combine_prompts');
+  // 某些版本/链路只发 generation_started；也一并兜底
+  bindEventHook('GENERATION_STARTED', 'generation_started');
+  // impersonate / 某些特殊入口可能走这里
+  bindEventHook('IMPERSONATE_READY', 'impersonate_ready');
+
+  // 生成结束后清理，避免残留到无关流程
+  const clearPrompt = () => {
+    try {
+      if (!(typeof setExtensionPrompt === 'function' && extension_prompt_types)) return;
+      if (_rpPhoneExtractClearTimer) {
+        clearTimeout(_rpPhoneExtractClearTimer);
+        _rpPhoneExtractClearTimer = null;
+      }
+      setExtensionPrompt(RP_PHONE_EXTRACT_KEY, '', extension_prompt_types.BEFORE_PROMPT, 0, false, 0);
+    } catch (e) {}
+  };
+  try {
+    if (eventSource && event_types) {
+      const endedEv = event_types.GENERATION_ENDED;
+      if (endedEv) eventSource.on(endedEv, clearPrompt);
+      const stoppedEv = event_types.GENERATION_STOPPED;
+      if (stoppedEv) eventSource.on(stoppedEv, clearPrompt);
+    }
+  } catch (e) {
+    console.warn('[PhoneExtract] clearPrompt hook failed:', e);
+  }
+
+  // DOM 兜底：标准发送按钮
   document.addEventListener('click', function(e) {
     const btn = e.target && e.target.closest ? e.target.closest('#send_but') : null;
     if (!btn) return;
     applyPhoneExtractionPrompt('send_button');
   }, true);
 
-  // 普通正文发送：Enter
+  // DOM 兜底：主输入框 Enter
   document.addEventListener('keydown', function(e) {
     const ta = e.target;
     if (!ta || ta.id !== 'send_textarea') return;
     if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
       applyPhoneExtractionPrompt('send_enter');
     }
+  }, true);
+
+  // DOM 兜底：部分版本/主题里 regenerate / continue / swipe 用独立按钮
+  const actionSelectors = [
+    '#option_regenerate', '#option_continue', '#mes_continue',
+    '#swipe_left', '#swipe_right',
+    '[data-action="regenerate"]', '[data-action="continue"]',
+    '[data-action="swipe-left"]', '[data-action="swipe-right"]'
+  ].join(',');
+
+  document.addEventListener('click', function(e) {
+    const btn = e.target && e.target.closest ? e.target.closest(actionSelectors) : null;
+    if (!btn) return;
+    applyPhoneExtractionPrompt('generation_action_button');
   }, true);
 }
 
