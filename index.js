@@ -1673,7 +1673,7 @@ const RP_PHONE_CSS = `/* ── wrapper ── */
 }
 
 /* ══ NUCLEAR: ALL views always transparent ══ */
-#rp-view-messages,#rp-view-thread,#rp-bubbles,#rp-view-moments,#rp-view-settings,#rp-view-api-settings,#rp-view-game,#rp-view-themes {
+#rp-view-messages,#rp-view-thread,#rp-bubbles,#rp-view-moments,#rp-view-settings,#rp-view-api-settings,#rp-view-game,#rp-view-themes,#rp-view-summary {
   background: transparent !important;
 }
 
@@ -1900,7 +1900,8 @@ const RP_PHONE_CSS = `/* ── wrapper ── */
 #rp-phone.rp-theme-candy #rp-view-settings,
 #rp-phone.rp-theme-candy #rp-view-api-settings,
 #rp-phone.rp-theme-candy #rp-view-game,
-#rp-phone.rp-theme-candy #rp-view-themes {
+#rp-phone.rp-theme-candy #rp-view-themes,
+#rp-phone.rp-theme-candy #rp-view-summary {
   background: var(--rp-home-wall) !important;
   background-size: cover !important;
   background-position: center !important;
@@ -1911,7 +1912,8 @@ const RP_PHONE_CSS = `/* ── wrapper ── */
 #rp-phone.rp-theme-star #rp-view-settings,
 #rp-phone.rp-theme-star #rp-view-api-settings,
 #rp-phone.rp-theme-star #rp-view-game,
-#rp-phone.rp-theme-star #rp-view-themes {
+#rp-phone.rp-theme-star #rp-view-themes,
+#rp-phone.rp-theme-star #rp-view-summary {
   background: var(--rp-home-wall) !important;
   background-size: cover !important;
   background-position: center !important;
@@ -1922,7 +1924,8 @@ const RP_PHONE_CSS = `/* ── wrapper ── */
 #rp-phone.rp-theme-misty #rp-view-settings,
 #rp-phone.rp-theme-misty #rp-view-api-settings,
 #rp-phone.rp-theme-misty #rp-view-game,
-#rp-phone.rp-theme-misty #rp-view-themes {
+#rp-phone.rp-theme-misty #rp-view-themes,
+#rp-phone.rp-theme-misty #rp-view-summary {
   background: var(--rp-home-wall) !important;
   background-size: cover !important;
   background-position: center !important;
@@ -2114,6 +2117,124 @@ const RP_PHONE_CSS = `/* ── wrapper ── */
 /* ── SETTINGS VIEW ── */
 #rp-view-settings{background:transparent;display:flex;flex-direction:column;overflow-y:auto}
 #rp-view-api-settings{background:transparent;display:flex;flex-direction:column}
+#rp-view-summary{background:transparent;display:flex;flex-direction:column;overflow:hidden}
+#rp-phone.rp-theme-candy #rp-view-summary,
+#rp-phone.rp-theme-star #rp-view-summary,
+#rp-phone.rp-theme-misty #rp-view-summary {
+  background: var(--rp-home-wall) !important;
+  background-size: cover !important;
+  background-position: center !important;
+}
+#rp-summary-wrap{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  padding:12px 12px 18px;
+  min-height:0;
+}
+#rp-summary-card{
+  background:rgba(255,255,255,.62);
+  backdrop-filter:blur(16px) saturate(1.15);
+  -webkit-backdrop-filter:blur(16px) saturate(1.15);
+  border:1px solid rgba(255,255,255,.72);
+  border-radius:20px;
+  box-shadow:0 6px 24px rgba(0,0,0,.08);
+  padding:14px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  min-height:0;
+  flex:1;
+}
+#rp-phone.rp-theme-star #rp-summary-card{
+  background:rgba(16,10,45,.72) !important;
+  border-color:rgba(140,110,255,.28) !important;
+  box-shadow:0 10px 30px rgba(0,0,0,.32) !important;
+}
+#rp-phone.rp-theme-misty #rp-summary-card{
+  background:rgba(228,242,252,.70) !important;
+  border-color:rgba(100,170,220,.26) !important;
+}
+#rp-summary-meta{
+  font-size:11px;
+  line-height:1.55;
+  color:rgba(80,24,48,.72);
+}
+#rp-phone.rp-theme-star #rp-summary-meta{ color:rgba(212,200,255,.72) !important; }
+#rp-phone.rp-theme-misty #rp-summary-meta{ color:rgba(22,50,74,.70) !important; }
+#rp-summary-text{
+  flex:1;
+  min-height:260px;
+  width:100%;
+  box-sizing:border-box;
+  resize:none;
+  border:none;
+  outline:none;
+  background:rgba(255,255,255,.74);
+  border:1px solid rgba(0,0,0,.08);
+  border-radius:16px;
+  padding:12px 13px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+  font-size:12px;
+  line-height:1.65;
+  color:#3a1020;
+  white-space:pre-wrap;
+  overflow:auto;
+}
+#rp-phone.rp-theme-star #rp-summary-text{
+  background:rgba(28,16,70,.84) !important;
+  border-color:rgba(140,110,255,.28) !important;
+  color:#eee7ff !important;
+}
+#rp-phone.rp-theme-misty #rp-summary-text{
+  background:rgba(247,252,255,.88) !important;
+  border-color:rgba(100,170,220,.22) !important;
+  color:#16324a !important;
+}
+#rp-summary-actions{
+  display:flex;
+  gap:8px;
+}
+#rp-summary-actions button{
+  flex:1;
+  min-width:0;
+  border:none;
+  border-radius:14px;
+  padding:10px 12px;
+  font-size:13px;
+  font-weight:700;
+  font-family:inherit;
+  cursor:pointer;
+}
+#rp-summary-refresh{
+  background:rgba(255,255,255,.78);
+  color:#7a1038;
+  border:1px solid rgba(220,130,165,.28);
+}
+#rp-summary-copy{
+  background:linear-gradient(135deg,#e0567a,#f472b6);
+  color:#fff;
+  box-shadow:0 4px 14px rgba(224,86,122,.28);
+}
+#rp-phone.rp-theme-star #rp-summary-refresh{
+  background:rgba(54,30,120,.62) !important;
+  color:#ddd4ff !important;
+  border:1px solid rgba(140,110,255,.38) !important;
+}
+#rp-phone.rp-theme-star #rp-summary-copy{
+  background:linear-gradient(135deg,#7c3aed,#a855f7) !important;
+  box-shadow:0 4px 14px rgba(124,58,237,.35) !important;
+}
+#rp-phone.rp-theme-misty #rp-summary-refresh{
+  background:rgba(240,248,255,.82) !important;
+  color:#1a3050 !important;
+  border:1px solid rgba(100,170,220,.28) !important;
+}
+#rp-phone.rp-theme-misty #rp-summary-copy{
+  background:linear-gradient(135deg,#2d6d9a,#4a8fbf) !important;
+  box-shadow:0 4px 14px rgba(45,109,154,.24) !important;
+}
 .rp-dark #rp-view-settings{background:transparent}
 .rp-set-section{background:#fff;border-radius:12px;margin:10px 12px 0;padding:0 14px;overflow:hidden}
 .rp-dark .rp-set-section{background:rgba(255,255,255,.04)}
@@ -5083,13 +5204,24 @@ function buildPhoneExtractionPrompt() {
     });
     if (threadLines.length) parts.push('【手机消息】\n' + threadLines.join('\n'));
 
-    // 最近朋友圈
+    // 最近朋友圈（含评论 / 回复）
     const momentLines = (STATE.moments || []).slice(-3).map(m => {
       const body = _rpClipText(_rpPlainText(m.text || m.body || ''), 80);
       if (!body) return '';
       const who = m.name || m.from || '某人';
       const t = [m.date, m.time].filter(Boolean).join(' ');
-      return '- ' + (t ? t + ' ' : '') + who + '：' + body;
+      const comments = (m.comments || []).slice(-4).map((c, idx, arr) => {
+        const cUser = c.name || c.user || c.from || '某人';
+        const cText = _rpClipText(_rpPlainText(c.text || c.body || ''), 36);
+        if (!cText) return '';
+        const replyToName = (c.replyTo !== null && c.replyTo !== undefined && arr[c.replyTo])
+          ? (arr[c.replyTo].name || arr[c.replyTo].user || arr[c.replyTo].from || '某人')
+          : '';
+        return replyToName
+          ? `↳ ${cUser} 回复 @${replyToName}：${cText}`
+          : `↳ ${cUser}：${cText}`;
+      }).filter(Boolean);
+      return '- ' + (t ? t + ' ' : '') + who + '：' + body + (comments.length ? '；评论：' + comments.join(' / ') : '');
     }).filter(Boolean);
     if (momentLines.length) parts.push('【朋友圈】\n' + momentLines.join('\n'));
 
@@ -5222,7 +5354,18 @@ function buildPhoneClipboardSummary() {
       if (!body) return '';
       const who = m.name || m.from || '某人';
       const t = [m.date, m.time].filter(Boolean).join(' ');
-      return '- ' + (t ? t + ' ' : '') + who + '：' + body;
+      const comments = (m.comments || []).slice(-8).map((c, idx, arr) => {
+        const cUser = c.name || c.user || c.from || '某人';
+        const cText = _rpClipText(_rpPlainText(c.text || c.body || ''), 120);
+        if (!cText) return '';
+        const replyToName = (c.replyTo !== null && c.replyTo !== undefined && arr[c.replyTo])
+          ? (arr[c.replyTo].name || arr[c.replyTo].user || arr[c.replyTo].from || '某人')
+          : '';
+        return replyToName
+          ? `↳ ${cUser} 回复 @${replyToName}：${cText}`
+          : `↳ ${cUser}：${cText}`;
+      }).filter(Boolean);
+      return '- ' + (t ? t + ' ' : '') + who + '：' + body + (comments.length ? '\n  ' + comments.join('\n  ') : '');
     }).filter(Boolean);
     if (momentLines.length) parts.push('【朋友圈】\n' + momentLines.join('\n'));
 
@@ -5263,6 +5406,26 @@ function buildPhoneClipboardSummary() {
   } catch (e) {
     console.warn('[PhoneExtract] buildPhoneClipboardSummary failed:', e);
     return '';
+  }
+}
+
+
+function renderPhoneSummaryView() {
+  try {
+    const text = buildPhoneClipboardSummary();
+    const finalText = text || '暂无可提取的手机内容。\n\n你可以先在短信、朋友圈、日记或小红书里生成一些内容，再回来查看。';
+    $('#rp-summary-text').val(finalText);
+    const lines = (text ? text.split(/\n+/).filter(Boolean).length : 0);
+    const chars = text ? text.length : 0;
+    const pieces = [
+      '把当前聊天绑定的小手机内容集中整理在这里。',
+      chars ? `当前约 ${chars} 字 / ${lines} 行。` : '当前还没有可提取内容。'
+    ];
+    $('#rp-summary-meta').text(pieces.join(' '));
+  } catch (e) {
+    console.warn('[PhoneExtract] renderPhoneSummaryView failed:', e);
+    $('#rp-summary-text').val('摘要渲染失败：' + (e?.message || e));
+    $('#rp-summary-meta').text('摘要渲染失败。');
   }
 }
 
@@ -5496,6 +5659,10 @@ const HTML = `
                   <div class="rp-app" data-app="xhs" title="小红书">
                     <div class="rp-app-ico"></div>
                     <div class="rp-app-lbl">小红书</div>
+                  </div>
+                  <div class="rp-app" data-app="summary" title="手机摘要">
+                    <div class="rp-app-ico"></div>
+                    <div class="rp-app-lbl">摘要</div>
                   </div>
                   <div class="rp-app" data-app="bank" title="银行卡">
                     <div class="rp-app-ico"></div>
@@ -5779,6 +5946,24 @@ const HTML = `
         </div>
 
                 <!-- 设置 -->
+        <div id="rp-view-summary" class="rp-view" style="display:none">
+          <div class="rp-nav-bar">
+            <button class="rp-back" data-to="home">‹</button>
+            <span class="rp-nav-title">手机摘要</span>
+            <button id="rp-summary-copy-top" class="rp-nav-add" title="复制">⎘</button>
+          </div>
+          <div id="rp-summary-wrap">
+            <div id="rp-summary-card">
+              <div id="rp-summary-meta">把当前聊天绑定的小手机内容集中整理在这里，点下方按钮即可刷新或复制。</div>
+              <textarea id="rp-summary-text" readonly placeholder="这里会显示手机摘要…"></textarea>
+              <div id="rp-summary-actions">
+                <button id="rp-summary-refresh">刷新摘要</button>
+                <button id="rp-summary-copy">复制到剪贴板</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div id="rp-view-settings" class="rp-view" style="display:none">
           <div class="rp-nav-bar">
             <button class="rp-back" data-to="home">‹</button>
@@ -7131,6 +7316,13 @@ function bindUI() {
   $(document).on('click', '#rp-copy-phone-summary', function() {
     copyPhoneSummaryToClipboard();
   });
+  $(document).on('click', '#rp-summary-copy, #rp-summary-copy-top', function() {
+    copyPhoneSummaryToClipboard();
+  });
+  $(document).on('click', '#rp-summary-refresh', function() {
+    renderPhoneSummaryView();
+    try { showBanner('手机摘要', '摘要已刷新', _rpNowHM()); } catch (e) {}
+  });
 
   // 银行卡 - 刷新按钮
   $(document).on('click', '#rp-bank-refresh', function() {
@@ -8073,7 +8265,7 @@ function go(view) {
   if (view === 'themes') { lgRenderThemePicker(); }
   $('.rp-view').hide();
   // 需要 flex 布局的视图
-  const flexViews = ['xhs','xhs-detail','xhs-compose','theme-studio'];
+  const flexViews = ['xhs','xhs-detail','xhs-compose','theme-studio','summary'];
   if (flexViews.includes(view)) {
     $(`#rp-view-${view}`).css('display','flex');
   } else {
@@ -8099,6 +8291,9 @@ function go(view) {
   }
   if (view === 'bank') {
     renderBankView();
+  }
+  if (view === 'summary') {
+    renderPhoneSummaryView();
   }
   if (view === 'xhs-detail') {
     // xhsCurrentPost 已在 openXHSDetail 中设置,这里只确保输入框重置
@@ -11057,6 +11252,7 @@ const RP_THEME_ICONS = {
   themes:        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9.5"/><circle cx="9"  cy="9.5"  r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="9.5"  r="1.4" fill="currentColor" stroke="none" opacity=".8"/><circle cx="9"  cy="14.5" r="1.4" fill="currentColor" stroke="none" opacity=".7"/><circle cx="15" cy="14.5" r="1.4" fill="currentColor" stroke="none" opacity=".6"/><circle cx="12" cy="12"   r="1.2" fill="currentColor" stroke="none" opacity=".5"/></svg>',
   diary:         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="13" height="20" rx="2.5"/><circle cx="6"  cy="7"  r="1.6" stroke-width="1.5"/><circle cx="6"  cy="12" r="1.6" stroke-width="1.5"/><circle cx="6"  cy="17" r="1.6" stroke-width="1.5"/><line x1="10" y1="8.5"  x2="17" y2="8.5"  stroke-width="1.5"/><line x1="10" y1="12.5" x2="17" y2="12.5" stroke-width="1.5" opacity=".7"/><line x1="10" y1="16.5" x2="15" y2="16.5" stroke-width="1.5" opacity=".5"/></svg>',
   xhs:           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="4"/><path d="M8.5 9.5L12 7l-.7 4 4-3.5" stroke-width="1.8"/><line x1="8" y1="15" x2="16" y2="15" stroke-width="1.6" opacity=".9"/><line x1="10" y1="18" x2="14" y2="18" stroke-width="1.6" opacity=".65"/></svg>',
+  summary:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="3.5"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12" opacity=".8"/><line x1="8" y1="16" x2="13" y2="16" opacity=".6"/></svg>',
   g2048:         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2"  y="2"  width="9" height="9" rx="2"/><rect x="13" y="2"  width="9" height="9" rx="2"/><rect x="2"  y="13" width="9" height="9" rx="2"/><rect x="13" y="13" width="9" height="9" rx="2"/></svg>',
   bank:          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="3"/><line x1="2" y1="10" x2="22" y2="10" stroke-width="2"/><line x1="6" y1="15" x2="9" y2="15" stroke-width="1.5"/><line x1="12" y1="15" x2="16" y2="15" stroke-width="1.5" opacity=".65"/></svg>'
 };
