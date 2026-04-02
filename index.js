@@ -4985,6 +4985,207 @@ function loadState(chatId) {
   } catch(e) { return null; }
 }
 
+
+// ================================================================
+//  PHONE EXTRACTION MODULE
+//  把手机侧(短信/朋友圈/日记/小红书等)摘要提取为隐藏上下文,
+//  注入到正文发送前的 BEFORE_PROMPT，解决“正文默认读不到手机内容”问题。
+// ================================================================
+const RP_PHONE_EXTRACT_KEY = 'rp-phone-extract';
+let _rpPhoneExtractClearTimer = null;
+let _rpPhoneExtractLastApplyAt = 0;
+
+function _rpClipText(text, maxLen) {
+  const s = String(text || '').trim();
+  if (!s) return '';
+  return s.length > maxLen ? s.slice(0, maxLen) + '…' : s;
+}
+
+function _rpPlainText(text) {
+  return String(text || '')
+    .replace(/<think>[\s\S]*?<\/think>/gi, ' ')
+    .replace(/<PHONE>[\s\S]*?<\/PHONE>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\[(?:手机短信提示|叙事指令|手机群聊提示)[^\]]*\]/g, ' ')
+    .replace(/:::writing[\s\S]*?:::/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function _rpFormatPhoneItem(msg, fallbackName) {
+  if (!msg) return '';
+  let body = '';
+  switch (msg.type) {
+    case 'image':
+      body = '[图片]';
+      break;
+    case 'pending_image':
+      body = '[待生成图片] ' + (msg.prompt || '');
+      break;
+    case 'location':
+      body = '[位置] ' + (msg.place || '');
+      break;
+    case 'voice':
+      body = `[语音${msg.duration ? ' ' + msg.duration : ''}] ` + (msg.text || '');
+      break;
+    case 'hongbao':
+      body = `[红包¥${msg.amount || ''}] ` + (msg.note || '');
+      break;
+    case 'call_rec':
+      body = '[通话] ' + (msg.label || msg.result || '');
+      break;
+    case 'group_msg':
+      body = (msg.name || fallbackName || '成员') + ': ' + (msg.text || '');
+      break;
+    default:
+      body = msg.text || msg.label || msg.note || msg.place || '';
+      break;
+  }
+  body = _rpClipText(_rpPlainText(body), 72);
+  if (!body) return '';
+  let who = '对方';
+  if (msg.from === 'user' || msg.from === 'me') who = '我';
+  else if (msg.from === 'system') who = '系统';
+  else if (msg.name) who = msg.name;
+  else if (fallbackName) who = fallbackName;
+  const t = msg.time ? String(msg.time).trim() : '';
+  return (t ? t + ' ' : '') + who + ': ' + body;
+}
+
+function buildPhoneExtractionPrompt() {
+  try {
+    const parts = [];
+
+    // 关系/同步信息
+    if (STATE.sync && (STATE.sync.stage || STATE.sync.progress || STATE.sync.status)) {
+      parts.push(`【关系进度】第${STATE.sync.stage || 1}阶段 / ${STATE.sync.progress || 0}% / ${STATE.sync.status || '进行中'}`);
+    }
+
+    // 最近短信 / 群聊
+    const allThreads = Object.values(STATE.threads || {}).filter(th => th && Array.isArray(th.messages) && th.messages.length);
+    const privateThreads = allThreads
+      .filter(th => th.type !== 'group' && !String(th.id || '').startsWith('grp_') && th.id !== 'user')
+      .sort((a, b) => (b.messages?.length || 0) - (a.messages?.length || 0))
+      .slice(0, 4);
+    const groupThreads = allThreads
+      .filter(th => th.type === 'group' || String(th.id || '').startsWith('grp_'))
+      .sort((a, b) => (b.messages?.length || 0) - (a.messages?.length || 0))
+      .slice(0, 2);
+
+    const threadLines = [];
+    privateThreads.forEach(th => {
+      const lines = (th.messages || []).slice(-3).map(m => _rpFormatPhoneItem(m, th.name)).filter(Boolean);
+      if (lines.length) threadLines.push(`私聊·${th.name}:\n- ` + lines.join('\n- '));
+    });
+    groupThreads.forEach(th => {
+      const lines = (th.messages || []).slice(-3).map(m => _rpFormatPhoneItem(m, th.name)).filter(Boolean);
+      if (lines.length) threadLines.push(`群聊·${th.name}:\n- ` + lines.join('\n- '));
+    });
+    if (threadLines.length) parts.push('【手机消息】\n' + threadLines.join('\n'));
+
+    // 最近朋友圈
+    const momentLines = (STATE.moments || []).slice(-3).map(m => {
+      const body = _rpClipText(_rpPlainText(m.text || m.body || ''), 80);
+      if (!body) return '';
+      const who = m.name || m.from || '某人';
+      const t = [m.date, m.time].filter(Boolean).join(' ');
+      return '- ' + (t ? t + ' ' : '') + who + '：' + body;
+    }).filter(Boolean);
+    if (momentLines.length) parts.push('【朋友圈】\n' + momentLines.join('\n'));
+
+    // 最近日记
+    const diaryLines = (STATE.diary || []).slice(-2).map(d => {
+      const role = d.author === 'user' ? '我' : '日记/AI';
+      const body = _rpClipText(_rpPlainText(d.text || ''), 90);
+      if (!body) return '';
+      const reply = d.reply ? '；回复：' + _rpClipText(_rpPlainText(d.reply), 50) : '';
+      const t = [d.date, d.time].filter(Boolean).join(' ');
+      return '- ' + (t ? t + ' ' : '') + role + '：' + body + reply;
+    }).filter(Boolean);
+    if (diaryLines.length) parts.push('【日记】\n' + diaryLines.join('\n'));
+
+    // 最近小红书
+    const xhsLines = (STATE.xhsFeed || []).slice(0, 3).map(p => {
+      const who = p.user || (p.from === 'user' ? '我' : '路人');
+      const title = _rpClipText(_rpPlainText(p.title || ''), 24);
+      const body = _rpClipText(_rpPlainText(p.body || ''), 70);
+      const merged = [title, body].filter(Boolean).join('｜');
+      if (!merged) return '';
+      const t = [p.date, p.time].filter(Boolean).join(' ');
+      return '- ' + (t ? t + ' ' : '') + who + '：' + merged;
+    }).filter(Boolean);
+    if (xhsLines.length) parts.push('【小红书】\n' + xhsLines.join('\n'));
+
+    if (!parts.length) return '';
+
+    const summary = _rpClipText(parts.join('\n\n'), 2200);
+    return `[手机提取模块: 以下是当前聊天绑定的小手机隐藏内容摘要，正文默认不会直接读到。请仅把它当作幕后连续性参考与补充记忆，不要提到“手机插件/提取模块/系统提示”。注意：这些信息不代表当前出场角色全部知情；涉及私聊、日记、朋友圈、小红书等内容时，除非剧情自然涉及或{{user}}主动提起，不要让角色生硬地直接知道原文。\n${summary}\n]`;
+  } catch (e) {
+    console.warn('[PhoneExtract] buildPhoneExtractionPrompt failed:', e);
+    return '';
+  }
+}
+
+function applyPhoneExtractionPrompt(reason) {
+  try {
+    if (!(typeof setExtensionPrompt === 'function' && extension_prompt_types)) return;
+    const now = Date.now();
+    if (now - _rpPhoneExtractLastApplyAt < 120) return;
+    _rpPhoneExtractLastApplyAt = now;
+
+    const prompt = buildPhoneExtractionPrompt();
+    setExtensionPrompt(
+      RP_PHONE_EXTRACT_KEY,
+      prompt || '',
+      extension_prompt_types.BEFORE_PROMPT,
+      0,
+      false,
+      0
+    );
+    if (_rpPhoneExtractClearTimer) clearTimeout(_rpPhoneExtractClearTimer);
+    _rpPhoneExtractClearTimer = setTimeout(() => {
+      try {
+        setExtensionPrompt(RP_PHONE_EXTRACT_KEY, '', extension_prompt_types.BEFORE_PROMPT, 0, false, 0);
+      } catch (e) {}
+    }, 1200);
+
+    if (prompt) {
+      console.log('[PhoneExtract] prompt injected', {
+        reason,
+        len: prompt.length,
+        hasThreads: Object.keys(STATE.threads || {}).length,
+        moments: (STATE.moments || []).length,
+        diary: (STATE.diary || []).length,
+        xhs: (STATE.xhsFeed || []).length,
+      });
+    }
+  } catch (e) {
+    console.warn('[PhoneExtract] applyPhoneExtractionPrompt failed:', e);
+  }
+}
+
+function installPhoneExtractionHook() {
+  if (window.__rpPhoneExtractHookInstalled) return;
+  window.__rpPhoneExtractHookInstalled = true;
+
+  // 普通正文发送：点发送按钮
+  document.addEventListener('click', function(e) {
+    const btn = e.target && e.target.closest ? e.target.closest('#send_but') : null;
+    if (!btn) return;
+    applyPhoneExtractionPrompt('send_button');
+  }, true);
+
+  // 普通正文发送：Enter
+  document.addEventListener('keydown', function(e) {
+    const ta = e.target;
+    if (!ta || ta.id !== 'send_textarea') return;
+    if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      applyPhoneExtractionPrompt('send_enter');
+    }
+  }, true);
+}
+
+
 // ================================================================
 //  HTML
 // ================================================================
@@ -5825,6 +6026,7 @@ async function init() {
   // 扩展初始化/热重载时清空指纹,防止旧指纹导致第一条新消息被 skip
   STATE._lastAiFingerprint = null;
   bindUI();
+  installPhoneExtractionHook();
   makeDraggable();
   renderThreadList();
   refreshWidget();
